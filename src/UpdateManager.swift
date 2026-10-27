@@ -37,16 +37,22 @@ struct GitHubRelease: Decodable {
         case name, body, prerelease, assets
     }
 
-    /// Extract version from release title (format: "iCanHazRepose x.x.x" or "iCHR x.x.x")
+    /// Extract version from release title (format: "iCanHazRepose x.x.x" or "iCHR x.x.x").
+    /// Falls back to the tag name (e.g. `v1.0.4`) so a release whose title does not
+    /// follow the convention still advertises a version.
     var parsedVersion: String? {
-        guard let name else { return nil }
-        let pattern = #"(?:iCanHazRepose|iCHR)\s+v?(\d+\.\d+\.\d+)"#
+        if let name, let parsed = Self.version(in: name) { return parsed }
+        return Self.version(in: tagName)
+    }
+
+    private static func version(in string: String) -> String? {
+        let pattern = #"(?:iCanHazRepose|iCHR)?\s*v?(\d+\.\d+\.\d+)"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-              let match = regex.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
-              let range = Range(match.range(at: 1), in: name) else {
+              let match = regex.firstMatch(in: string, range: NSRange(string.startIndex..., in: string)),
+              let range = Range(match.range(at: 1), in: string) else {
             return nil
         }
-        return String(name[range])
+        return String(string[range])
     }
 }
 
@@ -84,17 +90,17 @@ enum UpdateError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidGitHubResponse:
-            return "GitHub returned an invalid response."
+            return L10n.errInvalidGitHubResponse
         case .invalidDownloadedBundle:
-            return "The downloaded update does not contain a valid app bundle."
+            return L10n.errInvalidDownloadedBundle
         case .invalidArchiveEntry(let entry):
-            return "The downloaded archive contains an unsafe entry: \(entry)"
+            return L10n.errUnsafeArchiveEntry(entry)
         case .missingCodeSigningInfo:
-            return "A bundle is missing required code-signing information."
+            return L10n.errMissingCodeSigning
         case .mismatchedCodeSigningInfo:
-            return "The downloaded app was signed by a different identity."
+            return L10n.errMismatchedCodeSigning
         case .processFailed(let url, let status):
-            return "\(url.path) failed with status \(status)"
+            return L10n.errProcessFailed(url.path, status)
         }
     }
 }
@@ -104,8 +110,8 @@ enum UpdateError: LocalizedError {
 class UpdateManager {
     static let shared = UpdateManager()
 
-    private let owner = "deseven"
-    private let repo = "iCanHazRepose"
+    private let owner = AppConstants.githubOwner
+    private let repo = AppConstants.githubRepo
     private let session = URLSession.shared
 
     /// Interval between automatic update checks.
@@ -212,7 +218,7 @@ class UpdateManager {
                 let updateInfo = UpdateInfo(
                     version: version,
                     releaseTitle: release.name ?? version,
-                    changelog: release.body ?? "No changelog available.",
+                    changelog: release.body ?? L10n.noChangelog,
                     downloadURL: asset.browserDownloadURL
                 )
 

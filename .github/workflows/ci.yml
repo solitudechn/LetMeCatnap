@@ -1,0 +1,57 @@
+name: CI
+
+# Builds the app on every push / pull request so compile errors never reach main.
+# Releases are built by release.yml when a tag is pushed.
+
+on:
+  push:
+    branches: [main]
+    tags-ignore: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (universal)
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          swift --version
+          xcodebuild -version || true
+          sw_vers
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Build
+        # `ci` mode = release config, universal binary, ad-hoc signed,
+        # iCHR.zip + iCHR.dmg in ./dist, nothing is uploaded or launched.
+        run: ./build.sh ci
+
+      - name: Verify artifacts
+        run: |
+          test -f dist/iCHR.zip || { echo "::error::dist/iCHR.zip missing"; exit 1; }
+          unzip -l dist/iCHR.zip | head -20
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" \
+            "dist/iCanHazRepose.app/Contents/Info.plist"
+          lipo -archs "dist/iCanHazRepose.app/Contents/MacOS/iCanHazRepose"
+          codesign --verify --deep --strict --verbose=2 dist/iCanHazRepose.app
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: iCanHazRepose-${{ github.sha }}
+          path: |
+            dist/iCHR.zip
+            dist/iCHR.dmg
+          if-no-files-found: warn
+          retention-days: 14

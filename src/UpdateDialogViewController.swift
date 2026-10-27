@@ -46,7 +46,7 @@ class UpdateDialogViewController: NSViewController {
         let appName = AppConstants.appName
 
         // Header: "A new version of {appName} was found."
-        let headerText = "A new version of \(appName) was found."
+        let headerText = L10n.newVersionFound(appName)
         let headerLabel = NSTextField(wrappingLabelWithString: headerText)
         headerLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
         headerLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -86,24 +86,24 @@ class UpdateDialogViewController: NSViewController {
         }
 
         // Question label
-        let questionLabel = NSTextField(labelWithString: "Would you like to update?")
+        let questionLabel = NSTextField(labelWithString: L10n.wantToUpdate)
         questionLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .medium)
         questionLabel.translatesAutoresizingMaskIntoConstraints = false
 
         // Buttons
-        skipButton.title = "Skip this version"
+        skipButton.title = L10n.skipThisVersion
         skipButton.bezelStyle = .rounded
         skipButton.translatesAutoresizingMaskIntoConstraints = false
         skipButton.target = self
         skipButton.action = #selector(skipClicked)
 
-        laterButton.title = "Later"
+        laterButton.title = L10n.later
         laterButton.bezelStyle = .rounded
         laterButton.translatesAutoresizingMaskIntoConstraints = false
         laterButton.target = self
         laterButton.action = #selector(laterClicked)
 
-        updateButton.title = "Update"
+        updateButton.title = L10n.update
         updateButton.bezelStyle = .rounded
         updateButton.keyEquivalent = "\r" // default button
         updateButton.translatesAutoresizingMaskIntoConstraints = false

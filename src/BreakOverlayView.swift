@@ -82,13 +82,13 @@ struct BreakOverlayView: View {
                     }
 
                     VStack(spacing: 10) {
-                        Text("Time to Rest")
+                        Text(L10n.timeToRest)
                             .font(.system(size: 38, weight: .medium, design: .rounded))
                             .foregroundStyle(.white)
                             .opacity(appeared ? 1 : 0)
                             .offset(y: appeared ? 0 : 10)
 
-                        Text("Look away from the screen, stretch, and re-pose")
+                        Text(L10n.restHint)
                             .font(.system(size: 16, weight: .regular))
                             .foregroundStyle(.white.opacity(0.4))
                             .opacity(appeared ? 1 : 0)
@@ -99,10 +99,10 @@ struct BreakOverlayView: View {
                     if allowSkipBreak {
                         Button(action: { timerManager.skipBreak() }) {
                             HStack(spacing: 10) {
-                                Text("Skip")
+                                Text(L10n.skip)
                                     .font(.system(size: 15, weight: .medium))
                                     .foregroundStyle(.white.opacity(0.5))
-                                Text("Esc / ⌃Esc")
+                                Text(L10n.skipKeys)
                                     .font(.system(size: 11, weight: .medium, design: .rounded))
                                     .foregroundStyle(.white.opacity(0.25))
                             }

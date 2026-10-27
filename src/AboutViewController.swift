@@ -123,13 +123,13 @@ class AboutViewController: NSViewController {
 
         // "check for updates" link
         checkUpdatesButton = ActionLinkButton(
-            title: "check for updates",
+            title: L10n.checkForUpdates,
             target: self,
             action: #selector(checkForUpdatesClicked)
         )
 
         // "created by" section
-        let createdByLabel = NSTextField(labelWithString: "created by")
+        let createdByLabel = NSTextField(labelWithString: L10n.createdBy)
         createdByLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .bold)
         createdByLabel.textColor = .secondaryLabelColor
         createdByLabel.alignment = .center
@@ -138,7 +138,7 @@ class AboutViewController: NSViewController {
         let desevenLink = LinkButton(title: "deseven", url: AppConstants.websiteURL)
 
         // "original code by" section
-        let originalCodeByLabel = NSTextField(labelWithString: "original code by")
+        let originalCodeByLabel = NSTextField(labelWithString: L10n.originalCodeBy)
         originalCodeByLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .bold)
         originalCodeByLabel.textColor = .secondaryLabelColor
         originalCodeByLabel.alignment = .center
@@ -147,7 +147,7 @@ class AboutViewController: NSViewController {
         let fikriLink = LinkButton(title: "Fikri Karim", url: AppConstants.originalRepoURL)
 
         // "icons by" section
-        let iconsByLabel = NSTextField(labelWithString: "icons by")
+        let iconsByLabel = NSTextField(labelWithString: L10n.iconsBy)
         iconsByLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .bold)
         iconsByLabel.textColor = .secondaryLabelColor
         iconsByLabel.alignment = .center
@@ -313,12 +313,12 @@ class AboutViewController: NSViewController {
     @objc private func checkForUpdatesClicked() {
         guard !UpdateManager.shared.isChecking else { return }
 
-        checkUpdatesButton.title = "checking for updates..."
+        checkUpdatesButton.title = L10n.checkingForUpdates
         checkUpdatesButton.isEnabled = false
 
         UpdateManager.shared.checkForUpdates(manual: true) { [weak self] result in
             guard let self else { return }
-            self.checkUpdatesButton.title = "check for updates"
+            self.checkUpdatesButton.title = L10n.checkForUpdates
             self.checkUpdatesButton.isEnabled = true
 
             switch result {
@@ -327,17 +327,17 @@ class AboutViewController: NSViewController {
                     self.showUpdateDialog(updateInfo: updateInfo)
                 } else {
                     let alert = NSAlert()
-                    alert.messageText = "You have the latest available version!"
+                    alert.messageText = L10n.alreadyLatestVersion
                     alert.alertStyle = .informational
-                    alert.addButton(withTitle: "OK")
+                    alert.addButton(withTitle: L10n.ok)
                     alert.beginSheetModal(for: self.view.window!)
                 }
             case .failure(let error):
                 let alert = NSAlert()
-                alert.messageText = "Failed to check for updates"
+                alert.messageText = L10n.failedToCheckUpdates
                 alert.informativeText = error.localizedDescription
                 alert.alertStyle = .warning
-                alert.addButton(withTitle: "OK")
+                alert.addButton(withTitle: L10n.ok)
                 alert.beginSheetModal(for: self.view.window!)
             }
         }
@@ -354,10 +354,10 @@ class AboutViewController: NSViewController {
                         try await UpdateManager.shared.downloadAndInstall(updateInfo)
                     } catch {
                         let alert = NSAlert()
-                        alert.messageText = "Update failed"
+                        alert.messageText = L10n.updateFailed
                         alert.informativeText = error.localizedDescription
                         alert.alertStyle = .warning
-                        alert.addButton(withTitle: "OK")
+                        alert.addButton(withTitle: L10n.ok)
                         alert.runModal()
                     }
                 }
@@ -375,7 +375,7 @@ class AboutViewController: NSViewController {
         )
         sheetWindow.isReleasedWhenClosed = false
         sheetWindow.contentViewController = dialogVC
-        sheetWindow.title = "Update Available"
+        sheetWindow.title = L10n.updateAvailable
 
         window.beginSheet(sheetWindow)
     }
@@ -387,7 +387,7 @@ class AboutViewController: NSViewController {
            let text = try? String(contentsOf: url, encoding: .utf8) {
             return text
         }
-        return "License text not available."
+        return L10n.licenseUnavailable
     }
 
     private func makeIconButton(imageName: String, url: String) -> LinkButton {

@@ -2,10 +2,13 @@
   <img src="assets/icon.png" width="128" height="128" alt="iCanHazRepose icon"/>
   <h1>iCanHazRepose</h1>
   <p><strong>Take breaks from your screen. Without interrupting your meetings.</strong></p>
-  <a href="https://github.com/deseven/iCanHazRepose/releases/latest/download/iCHR.dmg">
+  <a href="https://github.com/solitudechn/iCanHazRepose/releases/latest/download/iCHR.dmg">
     <img src="assets/download-button.svg" alt="Download for Mac">
   </a>
-  <p><sub>Free and open source. Requires macOS 13+.</sub></p>
+  <p><sub>Free and open source. Requires macOS 13+. 简体中文界面。</sub></p>
+
+  [![CI](https://github.com/solitudechn/iCanHazRepose/actions/workflows/ci.yml/badge.svg)](https://github.com/solitudechn/iCanHazRepose/actions/workflows/ci.yml)
+  [![Release](https://github.com/solitudechn/iCanHazRepose/actions/workflows/release.yml/badge.svg)](https://github.com/solitudechn/iCanHazRepose/actions/workflows/release.yml)
 </div>
 
 <br/>
@@ -17,8 +20,17 @@
 <br/>
 
 <div align="center">
-  <a href="https://github.com/fikrikarim/repose">originally created by Fikri Karim</a>
+  <a href="https://github.com/fikrikarim/repose">originally created by Fikri Karim</a> ·
+  <a href="https://github.com/deseven/iCanHazRepose">maintained by deseven</a> ·
+  <a href="https://github.com/solitudechn/iCanHazRepose">简体中文 fork</a>
 </div>
+
+<br/>
+
+> **This is a fork.** It adds an English / 简体中文 UI on top of
+> [deseven/iCanHazRepose](https://github.com/deseven/iCanHazRepose) and ships its own
+> downloads and auto-updates. For anything that is not about the localization,
+> please use the upstream repository.
 
 <br/>
 
@@ -60,23 +72,59 @@ It's smart about passive screen use too: if you're watching a video (where apps 
 
 ### Download
 
-**Stable** release — download from the [Releases](https://github.com/deseven/iCanHazRepose/releases) page.
+**Stable** release — download from the [Releases](https://github.com/solitudechn/iCanHazRepose/releases) page.
 
-**Dev** build — compiled from the `main` branch: [download](https://d7.wtf/s/iCHR-dev.zip)  
+The download is not notarized, so the first launch may be blocked by Gatekeeper
+("damaged" / "cannot be verified"). Clear the quarantine flag once:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/iCanHazRepose.app
+```
+
+**Dev** build — every push to `main` is compiled by CI; grab the artifact from the
+[latest CI run](https://github.com/solitudechn/iCanHazRepose/actions/workflows/ci.yml).
 *(only use this if you need unreleased functionality or want to help with testing)*
 
 ### Build from source
 
 ```
-git clone https://github.com/deseven/iCanHazRepose.git
+git clone https://github.com/solitudechn/iCanHazRepose.git
 cd iCanHazRepose
 ./build.sh
 ```
 
 Requires Xcode 15+ and macOS 13+.
 
+## Localization / 界面语言
+
+The UI ships with **English** and **简体中文** and follows your system language by default. Override it any time from the menu bar: **Language / 语言 → 跟随系统 / English / 简体中文**. The change applies immediately — no restart needed.
+
+界面默认跟随系统语言（英文 / 简体中文），也可随时在菜单栏 **语言** 里手动切换，无需重启应用。
+
+All translatable strings live in [`src/L10n.swift`](src/L10n.swift).
+
+## Releasing
+
+```sh
+git tag v1.0.4 && git push origin v1.0.4
+```
+
+The `Release` workflow builds a universal `.app`, zips it as `iCHR.zip`, creates
+`iCHR.dmg`, stamps the version from the tag into `Info.plist`, and publishes a
+GitHub Release titled `iCanHazRepose 1.0.4`.
+
+Two details matter for the in-app updater — do not change them:
+
+- the release title must contain `iCanHazRepose x.y.z` (or `iCHR x.y.z`);
+- the zip asset must be named exactly `iCHR.zip`.
+
+Add `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID`
+and `NOTARY_APP_PASSWORD` as repository secrets to get a signed + notarized
+build; without them the artifacts are ad-hoc signed.
+
 ## Help & Support
 
-- [File an issue](https://github.com/deseven/iCanHazRepose/issues/new) for bugs, suggestions, or questions
+- [File an issue](https://github.com/solitudechn/iCanHazRepose/issues/new) for bugs, suggestions, or questions about this fork
+- [Upstream issues](https://github.com/deseven/iCanHazRepose/issues) for the app itself
 - Discord: https://discord.gg/YE9KyTXRPt
 - Reddit: https://www.reddit.com/r/iCanHazApps

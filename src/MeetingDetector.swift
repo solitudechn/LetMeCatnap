@@ -12,10 +12,10 @@ class MeetingDetector: ObservableObject {
 
         if cameraActive {
             isInMeeting = true
-            meetingSource = "Camera in use"
+            meetingSource = L10n.cameraInUse
         } else if micActive {
             isInMeeting = true
-            meetingSource = "Microphone in use"
+            meetingSource = L10n.microphoneInUse
         } else {
             isInMeeting = false
             meetingSource = nil

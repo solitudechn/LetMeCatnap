@@ -80,17 +80,17 @@ class TimerManager: ObservableObject {
         case .working:
             return formatTime(remainingSeconds)
         case .onBreak:
-            return "Break \(formatTime(remainingSeconds))"
+            return L10n.breakCountdown(formatTime(remainingSeconds))
         case .paused:
             switch pauseReason {
             case .meeting:
-                return "Meeting \(formatTime(secondsBeforePause))"
+                return L10n.meetingCountdown(formatTime(secondsBeforePause))
             case .breakPending:
-                return "Meeting"
+                return L10n.meetingInProgress
             case .idle:
-                return "Idle"
+                return L10n.idle
             case .manual:
-                return "Paused \(formatTime(secondsBeforePause))"
+                return L10n.pausedCountdown(formatTime(secondsBeforePause))
             }
         }
     }
@@ -99,13 +99,13 @@ class TimerManager: ObservableObject {
         guard state == .paused else { return nil }
         switch pauseReason {
         case .meeting:
-            return meetingDetector.meetingSource.map { "Paused — \($0)" } ?? "Paused — Meeting"
+            return meetingDetector.meetingSource.map { L10n.pausedWith($0) } ?? L10n.pausedInMeeting
         case .breakPending:
-            return meetingDetector.meetingSource.map { "\($0) — Break pending" } ?? "In meeting — Break pending"
+            return meetingDetector.meetingSource.map { L10n.breakPending($0) } ?? L10n.inMeetingBreakPending
         case .idle:
-            return "Paused — Idle"
+            return L10n.pausedIdle
         case .manual:
-            return "Paused"
+            return L10n.paused
         }
     }
 

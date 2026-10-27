@@ -59,12 +59,12 @@ struct CompactBreakOverlayView: View {
                 }
 
                 VStack(spacing: 8) {
-                    Text("Time to Rest")
+                    Text(L10n.timeToRest)
                         .font(.system(size: 24, weight: .medium, design: .rounded))
                         .foregroundStyle(.white)
                         .opacity(appeared ? 1 : 0)
 
-                    Text("Look away from the screen, stretch, and re-pose")
+                    Text(L10n.restHint)
                         .font(.system(size: 13, weight: .regular))
                         .foregroundStyle(.white.opacity(0.4))
                         .opacity(appeared ? 1 : 0)
@@ -73,10 +73,10 @@ struct CompactBreakOverlayView: View {
                 // Escape hint (non-clickable — mouse passes through to fullscreen app)
                 if allowSkipBreak {
                     HStack(spacing: 8) {
-                        Text("Skip")
+                        Text(L10n.skip)
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.white.opacity(0.5))
-                        Text("Esc / ⌃Esc")
+                        Text(L10n.skipKeys)
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                             .foregroundStyle(.white.opacity(0.25))
                     }

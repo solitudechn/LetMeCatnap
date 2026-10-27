@@ -1,0 +1,186 @@
+name: Release
+
+# Push a tag like v1.0.4 (or run this workflow manually) to build a signed /
+# notarized (when certificates are configured) universal build and publish it as
+# a GitHub Release.
+#
+# The in-app updater looks for a release whose title matches
+# "iCanHazRepose <x.y.z>" / "iCHR <x.y.z>" and downloads the asset named
+# exactly `iCHR.zip`. Both are produced below — do not rename the assets.
+#
+# Optional repository secrets:
+#   MACOS_CERT_P12          base64(.p12) with a "Developer ID Application" cert
+#   MACOS_CERT_PASSWORD     password of that .p12
+#   NOTARY_APPLE_ID         Apple ID for notarization
+#   NOTARY_TEAM_ID          10-character team id
+#   NOTARY_APP_PASSWORD     app-specific password
+# Without them the build is ad-hoc signed: it runs fine after the user clears
+# the quarantine attribute (see the release notes this workflow generates).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without the leading v (e.g. 1.0.4)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & publish
+    runs-on: macos-14
+    env:
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+      NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+      NOTARY_APP_PASSWORD: ${{ secrets.NOTARY_APP_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version '$VERSION' is not of the form x.y.z"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version $VERSION"
+
+      - name: Show toolchain
+        run: |
+          swift --version
+          xcodebuild -version || true
+
+      - name: Import signing certificate
+        if: env.MACOS_CERT_P12 != ''
+        env:
+          P12: ${{ secrets.MACOS_CERT_P12 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" \
+            -P "$P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)"/\1/')"
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No 'Developer ID Application' identity in the imported certificate"
+            exit 1
+          fi
+          echo "ICHR_SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+          echo "Signing as: $IDENTITY"
+
+      - name: Configure notarization
+        if: env.MACOS_CERT_P12 != '' && env.NOTARY_APPLE_ID != ''
+        run: |
+          set -euo pipefail
+          xcrun notarytool store-credentials "ichr-ci" \
+            --apple-id "$NOTARY_APPLE_ID" \
+            --team-id "$NOTARY_TEAM_ID" \
+            --password "$NOTARY_APP_PASSWORD"
+          echo "ICHR_NOTARY_PROFILE=ichr-ci" >> "$GITHUB_ENV"
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Build
+        env:
+          ICHR_VERSION: ${{ steps.version.outputs.version }}
+        run: ./build.sh ci
+
+      - name: Verify artifacts
+        run: |
+          set -euo pipefail
+          test -f dist/iCHR.zip || { echo "::error::dist/iCHR.zip missing"; exit 1; }
+          # The updater requires this exact asset name and a matching version.
+          BUILT="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' \
+            'dist/iCanHazRepose.app/Contents/Info.plist')"
+          test "$BUILT" = "${{ steps.version.outputs.version }}" || {
+            echo "::error::Bundle version $BUILT != ${{ steps.version.outputs.version }}"
+            exit 1
+          }
+          lipo -archs dist/iCanHazRepose.app/Contents/MacOS/iCanHazRepose
+          unzip -l dist/iCHR.zip | head -10
+
+      - name: Generate release notes
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          PREV="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
+          if [ -n "$PREV" ]; then
+            CHANGES="$(git log --pretty='- %s (%h)' "$PREV..HEAD")"
+            RANGE="Changes since $PREV"
+          else
+            CHANGES="$(git log --pretty='- %s (%h)' -20)"
+            RANGE="Recent changes"
+          fi
+
+          {
+            echo "简体中文版 · Universal binary (Apple Silicon + Intel) · macOS 13+"
+            echo
+            echo "### 安装 / Install"
+            echo '1. 下载 `iCHR.dmg`，把 `iCanHazRepose.app` 拖进“应用程序”。'
+            echo '2. 首次打开若提示“已损坏”或“无法验证开发者”，在终端执行：'
+            echo
+            echo '```sh'
+            echo 'xattr -dr com.apple.quarantine /Applications/iCanHazRepose.app'
+            echo '```'
+            echo
+            echo '3. 也可以直接用 `iCHR.zip`（应用内自动更新使用的就是这个包）。'
+            echo
+            echo "$CHANGES" | sed '/^$/d'
+            echo
+            echo "---"
+            echo "$RANGE"
+          } > "$RUNNER_TEMP/notes.md"
+
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          ASSETS=(dist/iCHR.zip)
+          if [ -f dist/iCHR.dmg ]; then ASSETS+=(dist/iCHR.dmg); fi
+
+          if gh release view "v$VERSION" > /dev/null 2>&1; then
+            gh release upload "v$VERSION" "${ASSETS[@]}" --clobber
+          else
+            gh release create "v$VERSION" "${ASSETS[@]}" \
+              --title "iCanHazRepose $VERSION" \
+              --notes-file "$RUNNER_TEMP/notes.md"
+          fi

@@ -21,6 +21,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     private var muteSoundsMenuItem: NSMenuItem!
     private var hideMenuBarTimerMenuItem: NSMenuItem!
     private var launchAtLoginMenuItem: NSMenuItem!
+    private var languageMenu: NSMenu!
 
     #if DEBUG
     private let workIntervalOptions = [1, 5, 10, 15, 20, 25, 30, 45, 60, 90]
@@ -61,21 +62,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         menu.addItem(.separator())
 
         // Pause / Resume
-        pauseResumeMenuItem = NSMenuItem(title: "Pause Timer", action: #selector(togglePause), keyEquivalent: "p")
+        pauseResumeMenuItem = NSMenuItem(
+            title: timerManager.state == .paused ? L10n.resumeTimer : L10n.pauseTimer,
+            action: #selector(togglePause), keyEquivalent: "p"
+        )
         pauseResumeMenuItem.target = self
         menu.addItem(pauseResumeMenuItem)
 
-        let restartItem = NSMenuItem(title: "Restart Timer", action: #selector(restartTimer), keyEquivalent: "r")
+        let restartItem = NSMenuItem(title: L10n.restartTimer, action: #selector(restartTimer), keyEquivalent: "r")
         restartItem.target = self
         menu.addItem(restartItem)
 
         menu.addItem(.separator())
 
         // Work Interval submenu
-        let workItem = NSMenuItem(title: "Work Interval", action: nil, keyEquivalent: "")
+        let workItem = NSMenuItem(title: L10n.workInterval, action: nil, keyEquivalent: "")
         workIntervalMenu = NSMenu()
         for minutes in workIntervalOptions {
-            let item = NSMenuItem(title: "\(minutes) min", action: #selector(setWorkInterval(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: L10n.minutes(minutes), action: #selector(setWorkInterval(_:)), keyEquivalent: "")
             item.target = self
             item.tag = minutes
             workIntervalMenu.addItem(item)
@@ -84,7 +88,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         menu.addItem(workItem)
 
         // Break Duration submenu
-        let breakItem = NSMenuItem(title: "Break Duration", action: nil, keyEquivalent: "")
+        let breakItem = NSMenuItem(title: L10n.breakDuration, action: nil, keyEquivalent: "")
         breakDurationMenu = NSMenu()
         for seconds in breakDurationOptions {
             let item = NSMenuItem(title: formatBreakDuration(seconds), action: #selector(setBreakDuration(_:)), keyEquivalent: "")
@@ -98,44 +102,56 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         menu.addItem(.separator())
 
         // Toggles
-        pauseDuringMeetingsMenuItem = NSMenuItem(title: "Pause During Meetings", action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
+        pauseDuringMeetingsMenuItem = NSMenuItem(title: L10n.pauseDuringMeetings, action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
         pauseDuringMeetingsMenuItem.target = self
         pauseDuringMeetingsMenuItem.representedObject = SettingsKey.pauseDuringMeetings
         menu.addItem(pauseDuringMeetingsMenuItem)
 
-        pauseWhenIdleMenuItem = NSMenuItem(title: "Pause When Idle", action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
+        pauseWhenIdleMenuItem = NSMenuItem(title: L10n.pauseWhenIdle, action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
         pauseWhenIdleMenuItem.target = self
         pauseWhenIdleMenuItem.representedObject = SettingsKey.pauseWhenIdle
         menu.addItem(pauseWhenIdleMenuItem)
 
-        allowSkipMenuItem = NSMenuItem(title: "Allow Skip Break", action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
+        allowSkipMenuItem = NSMenuItem(title: L10n.allowSkipBreak, action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
         allowSkipMenuItem.target = self
         allowSkipMenuItem.representedObject = SettingsKey.allowSkipBreak
         menu.addItem(allowSkipMenuItem)
 
-        muteSoundsMenuItem = NSMenuItem(title: "Mute Sounds", action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
+        muteSoundsMenuItem = NSMenuItem(title: L10n.muteSounds, action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
         muteSoundsMenuItem.target = self
         muteSoundsMenuItem.representedObject = SettingsKey.muteSounds
         menu.addItem(muteSoundsMenuItem)
 
-        hideMenuBarTimerMenuItem = NSMenuItem(title: "Hide Timer in Menu Bar", action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
+        hideMenuBarTimerMenuItem = NSMenuItem(title: L10n.hideMenuBarTimer, action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
         hideMenuBarTimerMenuItem.target = self
         hideMenuBarTimerMenuItem.representedObject = SettingsKey.hideMenuBarTimer
         menu.addItem(hideMenuBarTimerMenuItem)
 
         menu.addItem(.separator())
 
-        launchAtLoginMenuItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+        launchAtLoginMenuItem = NSMenuItem(title: L10n.launchAtLogin, action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         launchAtLoginMenuItem.target = self
         menu.addItem(launchAtLoginMenuItem)
 
+        // Language submenu
+        let languageItem = NSMenuItem(title: L10n.languageLabel, action: nil, keyEquivalent: "")
+        languageMenu = NSMenu()
+        for lang in L10n.Language.allCases {
+            let item = NSMenuItem(title: lang.displayName, action: #selector(setLanguage(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = lang.rawValue
+            languageMenu.addItem(item)
+        }
+        languageItem.submenu = languageMenu
+        menu.addItem(languageItem)
+
         menu.addItem(.separator())
 
-        let aboutItem = NSMenuItem(title: "About \(AppConstants.appName)", action: #selector(showAbout), keyEquivalent: "")
+        let aboutItem = NSMenuItem(title: L10n.about(AppConstants.appName), action: #selector(showAbout), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
 
-        let quitItem = NSMenuItem(title: "Quit \(AppConstants.appName)", action: #selector(quitApp), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: L10n.quit(AppConstants.appName), action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
 
@@ -161,14 +177,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         switch timerManager.state {
         case .working:
             if timerManager.isInMeeting {
-                statusMenuItem.title = "In meeting"
+                statusMenuItem.title = L10n.inMeeting
             } else {
-                statusMenuItem.title = "Next break in \(formatTime(timerManager.remainingSeconds))"
+                statusMenuItem.title = L10n.nextBreakIn(formatTime(timerManager.remainingSeconds))
             }
         case .onBreak:
-            statusMenuItem.title = "On a break"
+            statusMenuItem.title = L10n.onBreak
         case .paused:
-            statusMenuItem.title = timerManager.pauseStatusText ?? "Paused"
+            statusMenuItem.title = timerManager.pauseStatusText ?? L10n.paused
         }
     }
 
@@ -178,11 +194,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         // Pause / Resume
         switch timerManager.state {
         case .working:
-            pauseResumeMenuItem.title = "Pause Timer"
+            pauseResumeMenuItem.title = L10n.pauseTimer
             pauseResumeMenuItem.isEnabled = true
             pauseResumeMenuItem.isHidden = false
         case .paused:
-            pauseResumeMenuItem.title = "Resume Timer"
+            pauseResumeMenuItem.title = L10n.resumeTimer
             pauseResumeMenuItem.isEnabled = timerManager.currentPauseReason != .meeting && timerManager.currentPauseReason != .breakPending
             pauseResumeMenuItem.isHidden = false
         default:
@@ -208,6 +224,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         muteSoundsMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.muteSounds) ? .on : .off
         hideMenuBarTimerMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.hideMenuBarTimer) ? .on : .off
         launchAtLoginMenuItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
+
+        // Language checkmarks
+        let currentLang = L10n.preference.rawValue
+        for item in languageMenu.items {
+            if let raw = item.representedObject as? String {
+                item.state = raw == currentLang ? .on : .off
+            }
+        }
     }
 
     // MARK: - Status bar title updates
@@ -297,6 +321,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         }
     }
 
+    @objc private func setLanguage(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let lang = L10n.Language(rawValue: raw) else { return }
+        L10n.preference = lang
+        Log.info("UI language changed to \(lang.rawValue)")
+        // Rebuilding the menu swaps `statusItem.menu` while that very menu is
+        // still being tracked by AppKit (this action fires from inside it), so
+        // defer to the next run loop iteration and let it close first.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.buildMenu()
+            self.updateMenuItems()
+        }
+    }
+
     @objc private func toggleLaunchAtLogin() {
         let currentlyEnabled = SMAppService.mainApp.status == .enabled
         let newStatus = !currentlyEnabled
@@ -316,7 +355,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
 
         let window = NSWindow(contentViewController: aboutVC)
         window.styleMask = [.titled, .closable, .resizable]
-        window.title = "About \(AppConstants.appName)"
+        window.title = L10n.about(AppConstants.appName)
         window.setContentSize(NSSize(width: 700, height: 520))
         window.isReleasedWhenClosed = false
         window.center()
@@ -352,10 +391,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
                         try await UpdateManager.shared.downloadAndInstall(updateInfo)
                     } catch {
                         let alert = NSAlert()
-                        alert.messageText = "Update failed"
+                        alert.messageText = L10n.updateFailed
                         alert.informativeText = error.localizedDescription
                         alert.alertStyle = .critical
-                        alert.addButton(withTitle: "OK")
+                        alert.addButton(withTitle: L10n.ok)
                         alert.runModal()
                     }
                 }
@@ -367,7 +406,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
 
         let window = NSWindow(contentViewController: vc)
         window.styleMask = [.titled, .closable]
-        window.title = "Software Update"
+        window.title = L10n.softwareUpdate
 
         // Present as a sheet on the key window, or as a regular window if none
         if let keyWindow = NSApp.keyWindow {
@@ -402,9 +441,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
 
     private func formatBreakDuration(_ seconds: Int) -> String {
         if seconds < 60 {
-            return "\(seconds) sec"
+            return L10n.seconds(seconds)
         } else {
-            return "\(seconds / 60) min"
+            return L10n.minutes(seconds / 60)
         }
     }
 }

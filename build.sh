@@ -24,19 +24,37 @@ noColor='\033[0m'
 
 cd "$loc"
 
+# Progress / error output goes to the terminal when there is one, and to
+# stderr otherwise (CI runners have no controlling terminal).
+if [ -c /dev/tty ] && { true > /dev/tty; } 2>/dev/null; then
+    TTY=/dev/tty
+else
+    TTY=/dev/stderr
+fi
+
 # ── Determine build mode ─────────────────────────────────────────────
+#   dev         debug build, ad-hoc signed, launches the app
+#   dev-release release build, universal, zipped, uploaded to the dev channel
+#   release     release build, universal, zipped + DMG (for a GitHub release)
+#   ci          same artifacts as `release`, never uploads, never launches
 mode="dev"
 case "${1:-}" in
     dev-release) mode="dev-release" ;;
     release)     mode="release" ;;
+    ci)          mode="ci" ;;
     *)           mode="dev" ;;
 esac
 
-if [ "$mode" = "release" ]; then
+if [ "$mode" = "release" ] || [ "$mode" = "ci" ]; then
     buildConfig="release"
 else
     buildConfig="debug"
 fi
+
+# Optional: inject the version into the bundle (used by CI, where the
+# version comes from the git tag instead of Info.plist).
+ICHR_VERSION="${ICHR_VERSION:-}"
+ICHR_VERSION="${ICHR_VERSION#v}"
 
 # ── Determine signing & notarization ─────────────────────────────────
 can_sign=false
@@ -54,11 +72,11 @@ fi
 # ── Helpers ──────────────────────────────────────────────────────────
 
 die() {
-    echo -e "${redColor}[FAILED]${noColor}" > /dev/tty
-    echo -e "  ${redColor}$1${noColor}" > /dev/tty
-    echo -e "  ${dimColor}--- error output ---${noColor}" > /dev/tty
-    tail -n +"$logMark" "$logFile" > /dev/tty 2>&1
-    echo -e "  ${dimColor}--- end error output ---${noColor}" > /dev/tty
+    echo -e "${redColor}[FAILED]${noColor}" > "$TTY"
+    echo -e "  ${redColor}$1${noColor}" > "$TTY"
+    echo -e "  ${dimColor}--- error output ---${noColor}" > "$TTY"
+    tail -n +"$logMark" "$logFile" > "$TTY" 2>&1
+    echo -e "  ${dimColor}--- end error output ---${noColor}" > "$TTY"
     exit 1
 }
 
@@ -148,6 +166,14 @@ do_create_bundle() {
     cp "$loc/res/main.icns" "$loc/dist/$name.app/Contents/Resources/"
     cp "$loc/res/ui/"*.png "$loc/dist/$name.app/Contents/Resources/"
     cp "$loc/LICENSE" "$loc/dist/$name.app/Contents/Resources/"
+
+    # Override the version when the caller supplies one (git tag in CI).
+    if [ -n "$ICHR_VERSION" ]; then
+        local plist="$loc/dist/$name.app/Contents/Info.plist"
+        /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $ICHR_VERSION" "$plist"
+        /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $ICHR_VERSION" "$plist"
+        echo "version set to $ICHR_VERSION"
+    fi
 }
 
 do_codesign() {
@@ -172,6 +198,11 @@ do_create_zip() {
 }
 
 do_create_dmg() {
+    if ! command -v create-dmg >/dev/null 2>&1; then
+        echo "create-dmg not installed (brew install create-dmg) — skipping DMG"
+        echo "create-dmg not installed — DMG skipped" > "$TTY"
+        return 0
+    fi
     local dmgStaging="$loc/dist/dmg_staging"
     rm -rf "$dmgStaging"
     mkdir -p "$dmgStaging"
@@ -256,6 +287,18 @@ case "$mode" in
             totalSteps=$((totalSteps + 1))
         fi
         ;;
+    ci)
+        totalSteps=9
+        if [ "$can_sign" = true ]; then
+            totalSteps=$((totalSteps + 1))
+        fi
+        if [ "$can_notarize" = true ]; then
+            totalSteps=$((totalSteps + 3))
+        fi
+        if [ "$can_sign" = true ]; then
+            totalSteps=$((totalSteps + 1))
+        fi
+        ;;
 esac
 
 # ── Build ────────────────────────────────────────────────────────────
@@ -276,7 +319,7 @@ run_step "Creating APP bundle..."                 "failed to create app bundle" 
 run_step "Code-signing APP bundle..."             "failed to code-sign app bundle"           do_codesign
 
 if [ "$mode" != "dev" ]; then
-    if [ "$mode" = "release" ]; then
+    if [ "$mode" = "release" ] || [ "$mode" = "ci" ]; then
         run_step "Creating distribution ZIP..."    "failed to pack $shortName.zip"            do_create_zip "$shortName.zip"
         run_step "Creating distribution DMG..."    "failed to create dmg"                     do_create_dmg
         if [ "$can_sign" = true ]; then
@@ -287,7 +330,9 @@ if [ "$mode" != "dev" ]; then
             run_step "Stapling APP bundle..."      "failed to staple app bundle"              do_staple_app
             run_step "Stapling release DMG..."     "failed to staple release DMG"             do_staple_dmg
         fi
-        if [ "$can_sign" = true ]; then
+        # `spctl` only passes for notarized builds, so don't gate CI on it
+        # when no signing/notarization credentials are configured.
+        if [ "$can_sign" = true ] && { [ "$mode" = "release" ] || [ "$can_notarize" = true ]; }; then
             run_step "Verifying signatures..."     "failed to verify signatures"              do_verify
         fi
     else
@@ -326,5 +371,16 @@ case "$mode" in
         echo -e "  ${dimColor}signing: $(if [ "$can_sign" = true ]; then echo "${greenColor}Developer ID${noColor}"; else echo "${redColor}ad-hoc${noColor}"; fi)"
         echo -e "  ${dimColor}notarized: $(if [ "$can_notarize" = true ]; then echo "${greenColor}yes${noColor}"; else echo "${redColor}no${noColor}"; fi)"
         echo -e "  ${dimColor}artifacts: dist/$name.app  dist/$shortName.zip  dist/$shortName.dmg${noColor}"
+        ;;
+    ci)
+        ciArtifacts="dist/$name.app  dist/$shortName.zip"
+        if [ -f "$loc/dist/$shortName.dmg" ]; then
+            ciArtifacts="$ciArtifacts  dist/$shortName.dmg"
+        fi
+        echo -e "  ${dimColor}mode: ci${noColor}"
+        echo -e "  ${dimColor}version: ${ICHR_VERSION:-<from Info.plist>}${noColor}"
+        echo -e "  ${dimColor}signing: $(if [ "$can_sign" = true ]; then echo "${greenColor}Developer ID${noColor}"; else echo "${redColor}ad-hoc${noColor}"; fi)"
+        echo -e "  ${dimColor}notarized: $(if [ "$can_notarize" = true ]; then echo "${greenColor}yes${noColor}"; else echo "${redColor}no${noColor}"; fi)"
+        echo -e "  ${dimColor}artifacts: $ciArtifacts${noColor}"
         ;;
 esac
