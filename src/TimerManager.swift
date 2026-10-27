@@ -523,6 +523,10 @@ class TimerManager: ObservableObject {
         if !muteSounds { NSSound(named: "Blow")?.play() }
         overlayManager.dismissWithAnimation { [weak self] in
             guard let self else { return }
+            // During the 0.45s fade-out something else may already have taken
+            // over (a meeting interrupt paused the timer, the user skipped, or
+            // the system woke) — only restart work if the break is still ours.
+            guard self.state == .onBreak else { return }
             self.beginWorking(seconds: self.workDurationSeconds)
         }
     }
