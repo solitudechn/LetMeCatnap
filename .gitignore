@@ -10,3 +10,6 @@ Thumbs.db
 Package.resolved
 .env
 dist/
+
+# WorkBuddy 本地记忆（不随仓库分发）
+.workbuddy/
