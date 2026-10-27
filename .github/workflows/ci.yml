@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Show toolchain
         run: |
@@ -36,6 +36,19 @@ jobs:
         # `ci` mode = release config, universal binary, ad-hoc signed,
         # iCHR.zip + iCHR.dmg in ./dist, nothing is uploaded or launched.
         run: ./build.sh ci
+
+      - name: Collect build log
+        if: failure()
+        run: tail -c 200000 build.log > build-tail.log 2>/dev/null || true
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build-tail.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Verify artifacts
         run: |

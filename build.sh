@@ -77,6 +77,19 @@ die() {
     echo -e "  ${dimColor}--- error output ---${noColor}" > "$TTY"
     tail -n +"$logMark" "$logFile" > "$TTY" 2>&1
     echo -e "  ${dimColor}--- end error output ---${noColor}" > "$TTY"
+
+    # On GitHub Actions, surface the compiler errors as annotations. Without
+    # this the step just says "exit code 1" and the real message is buried in
+    # a multi-thousand-line log.
+    if [ -n "${GITHUB_ACTIONS:-}" ] && [ -f "$logFile" ]; then
+        tail -n +"$logMark" "$logFile" 2>/dev/null \
+            | grep -m 20 -E "error:|fatal error|Error:|No such file|not found" \
+            | sed -e 's/%/%25/g' -e 's/\r//g' 2>/dev/null \
+            | while IFS= read -r line; do
+                echo "::error::$line"
+              done || true
+    fi
+
     exit 1
 }
 
