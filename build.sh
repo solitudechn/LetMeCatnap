@@ -204,10 +204,14 @@ do_create_dmg() {
         return 0
     fi
     local dmgStaging="$loc/dist/dmg_staging"
+    local dmgPath="$loc/dist/$shortName.dmg"
     rm -rf "$dmgStaging"
     mkdir -p "$dmgStaging"
     cp -R "$loc/dist/$name.app" "$dmgStaging/"
-    create-dmg \
+    # create-dmg drives Finder over AppleScript to lay the window out, which
+    # fails on headless CI runners. Fall back to a plain (layout-less) image so
+    # a release build never dies on cosmetics.
+    if ! create-dmg \
         --volname "$name" \
         --volicon "$loc/res/main.icns" \
         --background "$loc/res/dmg/bg.png" \
@@ -216,8 +220,14 @@ do_create_dmg() {
         --icon-size 128 \
         --icon "$name.app" 192 350 \
         --app-drop-link 448 350 \
-        "$loc/dist/$shortName.dmg" \
-        "$dmgStaging"
+        "$dmgPath" \
+        "$dmgStaging"; then
+        echo "create-dmg failed — falling back to hdiutil"
+        echo "create-dmg failed, using hdiutil" > "$TTY"
+        rm -f "$dmgPath"
+        hdiutil create -volname "$name" -srcfolder "$dmgStaging" \
+            -ov -format UDZO "$dmgPath"
+    fi
     rm -rf "$dmgStaging"
 }
 

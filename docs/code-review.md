@@ -24,7 +24,7 @@
 |---|------|------|------|
 | 1 | 自动更新读取的是**上游**仓库（`UpdateManager` 里写死 `owner = "deseven"`） | 最严重的一条：用户点「更新」会把汉化版整个替换成英文版；而且上游产物是 deseven 的 Developer ID 签名，本地版本是 ad-hoc 签名，签名身份校验必然失败 → 只会得到「更新失败」 | `owner/repo` 改为从 `AppConstants.githubOwner/githubRepo`（= 你的 fork）读，新增 `upstreamRepoURL` 仅用于署名链接 |
 | 2 | 版本号只在 `Info.plist` 里写死，CI 发版无法注入 | 发版后 `CFBundleVersion` 和 tag 不一致，更新器比较版本会错乱 | `build.sh` 支持 `ICHR_VERSION`，打包时用 `PlistBuddy` 写进 `CFBundleVersion` 和新增的 `CFBundleShortVersionString` |
-| 3 | `build.sh` 无法在 CI 运行 | 进度/错误输出写死 `> /dev/tty`，GitHub Actions 没有控制终端；`release` 模式还依赖 `create-dmg` 和自建上传脚本 `share` | 新增 `ci` 模式（release 配置 + 通用二进制 + zip/dmg，不上传不启动）；tty 探测并回退到 stderr；`create-dmg` 缺失时跳过而不是失败 |
+| 3 | `build.sh` 无法在 CI 运行 | 进度/错误输出写死 `> /dev/tty`，GitHub Actions 没有控制终端；`release` 模式还依赖 `create-dmg` 和自建上传脚本 `share` | 新增 `ci` 模式（release 配置 + 通用二进制 + zip/dmg，不上传不启动）；tty 探测并回退到 stderr；`create-dmg` 缺失或失败（无头环境里 Finder 脚本常失败）时回退 `hdiutil`，不再让发版死在窗口样式上 |
 | 4 | 没有自动编译 / 自动发布 | — | 新增 `.github/workflows/ci.yml` 与 `release.yml`（见第三节） |
 | 5 | 切语言时在菜单项回调里直接替换 `statusItem.menu` | AppKit 正在跟踪这个菜单，替换/释放它属于未定义行为，偶发崩溃或菜单卡住 | 改成 `DispatchQueue.main.async` 延后到下一轮 runloop 再重建 |
 | 6 | `System` 菜单项文案是 `跟随系统 / System` | 英文界面下也显示中文，很怪 | 改成 `L10n.t("System", "跟随系统")`，跟着当前语言走 |
