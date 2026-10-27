@@ -1,9 +1,82 @@
 import Foundation
 
-/// Simple stdout logger for debug output.
-/// All messages are prefixed with `[iCHR]` for easy identification.
+/// App logger: console output (debug builds) plus a rotating file log.
+///
+/// A menu bar app has nowhere to surface errors, so a user who reports "it
+/// stopped working" leaves no trace unless something is persisted. Writes are
+/// serialized on a private queue and the file is rotated to `iCanHazRepose.1.log`
+/// once it passes `maxFileSize`, so it can never grow without bound.
 enum Log {
+    private static let queue = DispatchQueue(label: "wtf.d7.icanhazrepose.log")
+    private static let maxFileSize = 1_000_000  // ~1 MB, roughly a month of use
+    private static let folderName = "iCanHazRepose"
+
+    /// `~/Library/Logs/iCanHazRepose/iCanHazRepose.log`
+    static var fileURL: URL {
+        let base = FileManager.default
+            .urls(for: .libraryDirectory, in: .userDomainMask)
+            .first
+            ?? URL(fileURLWithPath: NSHomeDirectory() + "/Library", isDirectory: true)
+        return base
+            .appendingPathComponent("Logs", isDirectory: true)
+            .appendingPathComponent(folderName, isDirectory: true)
+            .appendingPathComponent("iCanHazRepose.log", isDirectory: false)
+    }
+
     static func info(_ message: String) {
+        write("INFO", message)
+    }
+
+    static func error(_ message: String) {
+        write("ERROR", message)
+    }
+
+    // MARK: - Private
+
+    private static func write(_ level: String, _ message: String) {
+        #if DEBUG
         print("[iCHR] \(message)")
+        #endif
+        let stamp = timestamp()
+        queue.async {
+            append("\(stamp) [\(level)] \(message)\n")
+        }
+    }
+
+    private static func timestamp() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        return formatter.string(from: Date())
+    }
+
+    /// Runs on `queue` only.
+    private static func append(_ line: String) {
+        let fm = FileManager.default
+        let url = fileURL
+
+        try? fm.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        if let attributes = try? fm.attributesOfItem(atPath: url.path),
+           let size = (attributes[.size] as? NSNumber)?.intValue,
+           size > maxFileSize {
+            let backup = url.deletingPathExtension().appendingPathExtension("1.log")
+            try? fm.removeItem(at: backup)
+            try? fm.moveItem(at: url, to: backup)
+        }
+
+        guard let data = line.data(using: .utf8) else { return }
+
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            if (try? handle.seekToEnd()) != nil {
+                try? handle.write(contentsOf: data)
+            }
+        } else {
+            try? data.write(to: url)
+        }
     }
 }

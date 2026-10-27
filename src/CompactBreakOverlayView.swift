@@ -59,19 +59,21 @@ struct CompactBreakOverlayView: View {
                 }
 
                 VStack(spacing: 8) {
-                    Text(L10n.timeToRest)
+                    Text(timerManager.isLongBreak ? L10n.longBreakTitle : L10n.timeToRest)
                         .font(.system(size: 24, weight: .medium, design: .rounded))
                         .foregroundStyle(.white)
                         .opacity(appeared ? 1 : 0)
 
-                    Text(L10n.restHint)
+                    Text(timerManager.breakTip.isEmpty ? L10n.restHint : timerManager.breakTip)
                         .font(.system(size: 13, weight: .regular))
                         .foregroundStyle(.white.opacity(0.4))
+                        .multilineTextAlignment(.center)
                         .opacity(appeared ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.4), value: timerManager.breakTip)
                 }
 
                 // Escape hint (non-clickable — mouse passes through to fullscreen app)
-                if allowSkipBreak {
+                if allowSkipBreak && !timerManager.isBreakMandatory {
                     HStack(spacing: 8) {
                         Text(L10n.skip)
                             .font(.system(size: 13, weight: .medium))
@@ -85,6 +87,12 @@ struct CompactBreakOverlayView: View {
                     .background(.white.opacity(0.08), in: Capsule())
                     .overlay(Capsule().stroke(.white.opacity(0.1), lineWidth: 0.5))
                     .opacity(appeared ? 1 : 0)
+                } else if timerManager.isBreakMandatory {
+                    Text(L10n.breakMandatory)
+                        .font(.system(size: 11, weight: .regular))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(0.3))
+                        .opacity(appeared ? 1 : 0)
                 }
             }
             .padding(40)
@@ -115,7 +123,7 @@ struct CompactBreakOverlayView: View {
     }
 
     private func updateRingProgress() {
-        let total = CGFloat(timerManager.breakDurationSeconds)
+        let total = CGFloat(timerManager.currentBreakTotalSeconds)
         let remaining = CGFloat(timerManager.remainingSeconds)
         let progress = total > 0 ? (total - remaining) / total : 0
         if reduceMotion {

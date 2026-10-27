@@ -80,3 +80,17 @@
 15. 下载更新时加进度提示（现在只有「正在更新」和最终的失败弹窗）。
 16. 关于窗口加一行「简体中文汉化：solitudechn」，符合 MIT 的署名习惯，也方便用户反馈到你的仓库。
 17. `.roorules` 是上游给 AI 编码助手看的项目说明，保留没问题，建议在文件头注明来自上游。
+
+---
+
+## 已实现（本次迭代）
+
+| 功能 | 落点 | 说明 |
+|---|---|---|
+| 休息引导语 | `L10n.breakTips` · `BreakOverlayView` · `CompactBreakOverlayView` | 每次休息随机一条（中英各 10 条），长休息期间每 20 秒换一条，取词时排除上一条避免重复 |
+| 番茄节奏 | `SettingsKey.longBreakEvery` / `longBreakSeconds` · `TimerManager.startBreak()` | 每完成 N 个工作轮次进入长休息；菜单「番茄节奏」提供 关闭 / 2·10 / 3·15 / 4·15 / 4·25 / 5·30 六档，两个值编码进菜单项 tag 一起匹配 |
+| 渐进式提醒 | `SettingsKey.progressiveReminders` · `TimerManager.updateImminentFlag()` | 剩余 1 分钟时菜单栏图标切 `hourglass` 并轻响一声；连续跳过 2 次后，下一次休息不可跳过（`skipBreak()` 内部拦截，Esc 热键一并失效） |
+| 文件日志 | `Log.swift` | 写入 `~/Library/Logs/iCanHazRepose/iCanHazRepose.log`，串行队列 + 1 MB 滚动到 `.1.log`；启动时记录配置与日志路径 |
+
+同时修掉了 P1 第 8 条（日志只有 stdout）。仍未处理：计时器累计漂移（第 6 条）——
+`remainingSeconds -= 1` 的毛病还在，做统计类功能前必须先改 deadline 计算。

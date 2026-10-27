@@ -26,6 +26,12 @@ enum SettingsKey {
     static let pauseWhenIdle = "pauseWhenIdle"
     static let skippedUpdate = "skippedUpdate"
     static let hideMenuBarTimer = "hideMenuBarTimer"
+    /// 0 disables the pomodoro rhythm; otherwise every N finished work sessions
+    /// ends in a long break instead of a short one.
+    static let longBreakEvery = "longBreakEvery"
+    static let longBreakSeconds = "longBreakSeconds"
+    /// Warn before the break, and stop the user from skipping forever.
+    static let progressiveReminders = "progressiveReminders"
 }
 
 @MainActor
@@ -50,6 +56,21 @@ class TimerManager: ObservableObject {
     @Published var isInGracePeriod: Bool = false
     @Published var graceProgress: Double = 1
 
+    /// Guidance shown on the break overlay; rotated on long breaks.
+    @Published var breakTip: String = ""
+    /// Whether the running break is the longer one from the pomodoro rhythm.
+    @Published private(set) var isLongBreak: Bool = false
+    /// True during the last minute of a work session (progressive reminders).
+    @Published private(set) var isBreakImminent: Bool = false
+    /// Consecutive breaks the user skipped without taking them.
+    @Published private(set) var skipStreak: Int = 0
+
+    /// Finished work sessions since launch, used to place long breaks.
+    private var workSessionsCompleted: Int = 0
+    /// After this many consecutive skips the next break is not skippable.
+    private let mandatorySkipStreak = 2
+    private let impendingBreakSeconds = 60
+
     // Activity to prevent App Nap
     private var activity: NSObjectProtocol?
 
@@ -73,6 +94,34 @@ class TimerManager: ObservableObject {
 
     var pauseWhenIdle: Bool {
         UserDefaults.standard.bool(forKey: SettingsKey.pauseWhenIdle)
+    }
+
+    // MARK: - Pomodoro rhythm / progressive reminders
+
+    /// 0 = rhythm disabled. Clamped so a hand-edited plist cannot break the timer.
+    var longBreakEvery: Int {
+        UserDefaults.standard.integer(forKey: SettingsKey.longBreakEvery).clamped(to: 0...12)
+    }
+
+    /// A long break may well exceed the short-break UI cap (9:59).
+    var longBreakSeconds: Int {
+        UserDefaults.standard.integer(forKey: SettingsKey.longBreakSeconds).clamped(to: 60...3600)
+    }
+
+    /// Duration of the break in progress — the ring needs the real total,
+    /// otherwise a 15-minute break would fill up in 20 seconds.
+    var currentBreakTotalSeconds: Int {
+        isLongBreak ? longBreakSeconds : breakDurationSeconds
+    }
+
+    var progressiveReminders: Bool {
+        UserDefaults.standard.bool(forKey: SettingsKey.progressiveReminders)
+    }
+
+    /// Progressive reminders: after enough consecutive skips, the break is not
+    /// skippable any more.
+    var isBreakMandatory: Bool {
+        progressiveReminders && state == .onBreak && skipStreak >= mandatorySkipStreak
     }
 
     var menuBarText: String {
@@ -127,6 +176,9 @@ class TimerManager: ObservableObject {
             SettingsKey.muteSounds: false,
             SettingsKey.pauseWhenIdle: true,
             SettingsKey.hideMenuBarTimer: false,
+            SettingsKey.longBreakEvery: 4,
+            SettingsKey.longBreakSeconds: 900,
+            SettingsKey.progressiveReminders: true,
         ])
         // Start timer and ticker (ticker runs for app lifetime)
         remainingSeconds = workDurationSeconds
@@ -150,10 +202,12 @@ class TimerManager: ObservableObject {
         case .working:
             Log.info("Timer restarted after system wake")
             remainingSeconds = workDurationSeconds
+            isBreakImminent = false
         case .onBreak:
             Log.info("Break dismissed after system wake, timer restarted")
             overlayManager.dismissOverlay()
             remainingSeconds = workDurationSeconds
+            isBreakImminent = false
             state = .working
         case .paused:
             break
@@ -163,6 +217,7 @@ class TimerManager: ObservableObject {
     func start() {
         Log.info("Timer started: work=\(workDurationSeconds / 60)min, break=\(breakDurationSeconds)s")
         remainingSeconds = workDurationSeconds
+        isBreakImminent = false
         state = .working
     }
 
@@ -170,6 +225,7 @@ class TimerManager: ObservableObject {
         guard state == .working else { return }
         Log.info("Timer paused by user")
         secondsBeforePause = remainingSeconds
+        isBreakImminent = false
         state = .paused
         pauseReason = .manual
     }
@@ -183,10 +239,16 @@ class TimerManager: ObservableObject {
     }
 
     func skipBreak() {
+        guard !isBreakMandatory else {
+            Log.info("Break skip blocked: \(skipStreak) consecutive skips, this break is mandatory")
+            return
+        }
         Log.info("Break overlay closed: user cancelled")
         graceAnimTask?.cancel()
         graceAnimTask = nil
         overlayManager.dismissOverlay()
+        skipStreak += 1
+        isBreakImminent = false
         remainingSeconds = workDurationSeconds
         state = .working
     }
@@ -252,6 +314,7 @@ class TimerManager: ObservableObject {
 
         case .working:
             remainingSeconds -= 1
+            updateImminentFlag()
             if remainingSeconds <= 0 {
                 startBreak()
             }
@@ -266,10 +329,30 @@ class TimerManager: ObservableObject {
                 }
                 graceProgress = 1
                 remainingSeconds -= 1
+                // Rotate the guidance so a 15-minute break is not one line long.
+                if remainingSeconds > 0 && remainingSeconds % 20 == 0 {
+                    breakTip = L10n.randomBreakTip(excluding: breakTip)
+                }
                 if remainingSeconds <= 0 {
                     endBreak()
                 }
             }
+        }
+    }
+
+    /// Progressive reminders: one minute before the break, flag it so the menu
+    /// bar can switch to an hourglass and a soft chime can play.
+    private func updateImminentFlag() {
+        guard progressiveReminders else {
+            isBreakImminent = false
+            return
+        }
+        if remainingSeconds == impendingBreakSeconds {
+            isBreakImminent = true
+            Log.info("Break impending: \(impendingBreakSeconds)s left")
+            if !muteSounds { NSSound(named: "Tink")?.play() }
+        } else if remainingSeconds > impendingBreakSeconds || remainingSeconds <= 0 {
+            isBreakImminent = false
         }
     }
 
@@ -316,11 +399,19 @@ class TimerManager: ObservableObject {
             }
         }
 
-        remainingSeconds = breakDurationSeconds
+        // The work session finished: count it before picking the break that
+        // follows, so "every N sessions" lines up with what the user experienced.
+        workSessionsCompleted += 1
+        let every = longBreakEvery
+        isLongBreak = every > 0 && workSessionsCompleted % every == 0
+
+        remainingSeconds = currentBreakTotalSeconds
         state = .onBreak
+        isBreakImminent = false
         breakStartTime = Date()
         isInGracePeriod = true
         graceProgress = 0
+        breakTip = L10n.randomBreakTip(excluding: breakTip)
         startGraceAnimation()
 
         if isFrontmostAppFullscreen() {
@@ -331,6 +422,7 @@ class TimerManager: ObservableObject {
             Log.info("Break overlay triggered: full overlay (work timer expired)")
         }
 
+        Log.info("Break started: \(isLongBreak ? "long" : "short") \(currentBreakTotalSeconds)s (session #\(workSessionsCompleted))")
         if !muteSounds { NSSound(named: "Glass")?.play() }
     }
 
@@ -338,6 +430,7 @@ class TimerManager: ObservableObject {
         Log.info("Break overlay closed: timeout completed")
         graceAnimTask?.cancel()
         graceAnimTask = nil
+        skipStreak = 0
         if !muteSounds { NSSound(named: "Blow")?.play() }
         overlayManager.dismissWithAnimation { [weak self] in
             guard let self else { return }

@@ -15,8 +15,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     private var pauseResumeMenuItem: NSMenuItem!
     private var workIntervalMenu: NSMenu!
     private var breakDurationMenu: NSMenu!
+    private var pomodoroMenu: NSMenu!
     private var pauseDuringMeetingsMenuItem: NSMenuItem!
     private var allowSkipMenuItem: NSMenuItem!
+    private var progressiveMenuItem: NSMenuItem!
     private var pauseWhenIdleMenuItem: NSMenuItem!
     private var muteSoundsMenuItem: NSMenuItem!
     private var hideMenuBarTimerMenuItem: NSMenuItem!
@@ -31,12 +33,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     private let breakDurationOptions = [20, 30, 60, 120, 300, 600]
     #endif
 
+    /// `every == 0` turns the rhythm off. Encoded into the menu item tag as
+    /// `every * 10_000 + seconds` so one checkmark can match both values.
+    private let pomodoroPresets: [(every: Int, seconds: Int)] = [
+        (0, 0),
+        (2, 600),
+        (3, 900),
+        (4, 900),
+        (4, 1500),
+        (5, 1800),
+    ]
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         timerManager = TimerManager()
 
         Log.info("App started")
+        Log.info("Log file: \(Log.fileURL.path)")
         let ud = UserDefaults.standard
         Log.info("Config: work=\(timerManager.workDurationSeconds / 60)min, break=\(timerManager.breakDurationSeconds)s, pauseDuringMeetings=\(timerManager.pauseDuringMeetings), allowSkipBreak=\(ud.bool(forKey: SettingsKey.allowSkipBreak)), muteSounds=\(timerManager.muteSounds), pauseWhenIdle=\(timerManager.pauseWhenIdle), launchAtLogin=\(SMAppService.mainApp.status == .enabled)")
+        Log.info("Rhythm: longBreakEvery=\(timerManager.longBreakEvery), longBreak=\(timerManager.longBreakSeconds)s, progressiveReminders=\(timerManager.progressiveReminders)")
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(systemSymbolName: "timer", accessibilityDescription: AppConstants.appName)
@@ -99,6 +114,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         breakItem.submenu = breakDurationMenu
         menu.addItem(breakItem)
 
+        // Pomodoro rhythm submenu — every N work sessions ends in a long break
+        let pomodoroItem = NSMenuItem(title: L10n.pomodoroRhythm, action: nil, keyEquivalent: "")
+        pomodoroMenu = NSMenu()
+        for preset in pomodoroPresets {
+            let title = preset.every == 0
+                ? L10n.off
+                : L10n.longBreakPreset(every: preset.every, minutes: preset.seconds / 60)
+            let item = NSMenuItem(title: title, action: #selector(setPomodoroPreset(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = preset.every * 10000 + preset.seconds
+            pomodoroMenu.addItem(item)
+        }
+        pomodoroItem.submenu = pomodoroMenu
+        menu.addItem(pomodoroItem)
+
         menu.addItem(.separator())
 
         // Toggles
@@ -116,6 +146,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         allowSkipMenuItem.target = self
         allowSkipMenuItem.representedObject = SettingsKey.allowSkipBreak
         menu.addItem(allowSkipMenuItem)
+
+        progressiveMenuItem = NSMenuItem(title: L10n.progressiveReminders, action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
+        progressiveMenuItem.target = self
+        progressiveMenuItem.representedObject = SettingsKey.progressiveReminders
+        menu.addItem(progressiveMenuItem)
 
         muteSoundsMenuItem = NSMenuItem(title: L10n.muteSounds, action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
         muteSoundsMenuItem.target = self
@@ -217,10 +252,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
             item.state = item.tag == currentBreak ? .on : .off
         }
 
+        // Pomodoro rhythm checkmark — both values must match a preset
+        let rhythmTag = UserDefaults.standard.integer(forKey: SettingsKey.longBreakEvery) * 10000
+            + UserDefaults.standard.integer(forKey: SettingsKey.longBreakSeconds)
+        for item in pomodoroMenu.items {
+            item.state = item.tag == rhythmTag ? .on : .off
+        }
+
         // Toggle states
         pauseDuringMeetingsMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.pauseDuringMeetings) ? .on : .off
         pauseWhenIdleMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.pauseWhenIdle) ? .on : .off
         allowSkipMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.allowSkipBreak) ? .on : .off
+        progressiveMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.progressiveReminders) ? .on : .off
         muteSoundsMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.muteSounds) ? .on : .off
         hideMenuBarTimerMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.hideMenuBarTimer) ? .on : .off
         launchAtLoginMenuItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
@@ -256,7 +299,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     private func updateStatusBarTitle() {
         let icon: String
         switch timerManager.state {
-        case .working: icon = timerManager.isInMeeting ? "video.fill" : "timer"
+        case .working:
+            if timerManager.isInMeeting {
+                icon = "video.fill"
+            } else if timerManager.isBreakImminent {
+                // One minute left — progressive reminder.
+                icon = "hourglass"
+            } else {
+                icon = "timer"
+            }
         case .onBreak: icon = "cup.and.saucer.fill"
         case .paused:
             switch timerManager.currentPauseReason {
@@ -299,6 +350,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     @objc private func setBreakDuration(_ sender: NSMenuItem) {
         Log.info("Break duration changed to \(sender.tag)s")
         UserDefaults.standard.set(sender.tag, forKey: SettingsKey.breakDurationSeconds)
+    }
+
+    @objc private func setPomodoroPreset(_ sender: NSMenuItem) {
+        let every = sender.tag / 10000
+        let seconds = sender.tag % 10000
+        UserDefaults.standard.set(every, forKey: SettingsKey.longBreakEvery)
+        UserDefaults.standard.set(seconds, forKey: SettingsKey.longBreakSeconds)
+        Log.info("Pomodoro rhythm: every=\(every), longBreak=\(seconds)s")
     }
 
     @objc private func toggleBoolSetting(_ sender: NSMenuItem) {

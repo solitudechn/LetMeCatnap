@@ -82,21 +82,23 @@ struct BreakOverlayView: View {
                     }
 
                     VStack(spacing: 10) {
-                        Text(L10n.timeToRest)
+                        Text(timerManager.isLongBreak ? L10n.longBreakTitle : L10n.timeToRest)
                             .font(.system(size: 38, weight: .medium, design: .rounded))
                             .foregroundStyle(.white)
                             .opacity(appeared ? 1 : 0)
                             .offset(y: appeared ? 0 : 10)
 
-                        Text(L10n.restHint)
+                        Text(timerManager.breakTip.isEmpty ? L10n.restHint : timerManager.breakTip)
                             .font(.system(size: 16, weight: .regular))
                             .foregroundStyle(.white.opacity(0.4))
                             .opacity(appeared ? 1 : 0)
                             .offset(y: appeared ? 0 : 8)
+                            .animation(.easeInOut(duration: 0.4), value: timerManager.breakTip)
                     }
 
-                    // Skip button
-                    if allowSkipBreak {
+                    // Skip button — hidden when progressive reminders made this
+                    // break mandatory.
+                    if allowSkipBreak && !timerManager.isBreakMandatory {
                         Button(action: { timerManager.skipBreak() }) {
                             HStack(spacing: 10) {
                                 Text(L10n.skip)
@@ -120,6 +122,11 @@ struct BreakOverlayView: View {
                                 NSCursor.pop()
                             }
                         }
+                    } else if timerManager.isBreakMandatory {
+                        Text(L10n.breakMandatory)
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.3))
+                            .opacity(appeared ? 1 : 0)
                     }
 
                     Spacer()
@@ -145,7 +152,7 @@ struct BreakOverlayView: View {
     }
 
     private func updateRingProgress() {
-        let total = CGFloat(timerManager.breakDurationSeconds)
+        let total = CGFloat(timerManager.currentBreakTotalSeconds)
         let remaining = CGFloat(timerManager.remainingSeconds)
         let progress = total > 0 ? (total - remaining) / total : 0
         if reduceMotion {

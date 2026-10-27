@@ -128,6 +128,66 @@ extension L10n {
     /// Keyboard hint — key names are not translated.
     static var skipKeys: String { "Esc / ⌃Esc" }
 
+    // ── Break guidance ──────────────────────────────────────────
+
+    /// Shown instead of the static hint while the break overlay is up.
+    static var breakTips: [String] { isChinese ? zhBreakTips : enBreakTips }
+
+    /// A tip that differs from `current` so consecutive rotations never repeat.
+    static func randomBreakTip(excluding current: String? = nil) -> String {
+        let all = breakTips
+        let candidates = all.filter { $0 != current }
+        return candidates.randomElement() ?? all.first ?? ""
+    }
+
+    static var breakSoon: String { t("Break in 1 minute", "1 分钟后休息") }
+    static var breakMandatory: String {
+        t("You skipped twice — this one counts", "连跳两次了，这次认真休息一下")
+    }
+
+    private static var enBreakTips: [String] {
+        [
+            "Look 20 feet away for 20 seconds",
+            "Stand up and roll your shoulders",
+            "Take three slow, deep breaths",
+            "Drink a glass of water",
+            "Blink slowly and let your eyes relax",
+            "Look out of the window for a while",
+            "Stretch your neck to both sides",
+            "Unclench your jaw and soften your forehead",
+            "Shake out your hands and wrists",
+            "Walk a few steps",
+        ]
+    }
+
+    private static var zhBreakTips: [String] {
+        [
+            "看 20 英尺外的东西 20 秒",
+            "站起来转一转肩膀",
+            "慢慢深呼吸三次",
+            "去喝一杯水",
+            "缓慢眨眼，让眼睛放松",
+            "看看窗外",
+            "左右活动一下脖子",
+            "松开下巴，舒展眉心",
+            "甩甩手腕和手指",
+            "起身走几步",
+        ]
+    }
+
+    // ── Pomodoro rhythm ─────────────────────────────────────────
+
+    static var pomodoroRhythm: String { t("Pomodoro Rhythm", "番茄节奏") }
+    static var off: String            { t("Off", "关闭") }
+    static var longBreakTitle: String { t("Time for a Longer Break", "该长休息了") }
+    static var longBreakStarted: String { t("Long break", "长休息") }
+    static func longBreakPreset(every: Int, minutes: Int) -> String {
+        t("Every \(every) sessions · \(minutes) min", "每 \(every) 轮 · \(minutes) 分钟")
+    }
+
+    static var progressiveReminders: String { t("Progressive Reminders", "渐进式提醒") }
+
+
     // ── Update dialog ───────────────────────────────────────────
 
     static func newVersionFound(_ name: String) -> String {
