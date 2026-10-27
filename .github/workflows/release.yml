@@ -67,10 +67,19 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building version $VERSION"
 
-      - name: Show toolchain
+      - name: Select Xcode
+        # Always build with a full Xcode: Command Line Tools cannot expand the
+        # SwiftUI macros (@State etc.) this app uses, and the image ships
+        # several Xcode versions that come and go between image updates.
         run: |
+          set -euo pipefail
+          XCODE_APP="$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          echo "using $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP"
+          echo "DEVELOPER_DIR=$XCODE_APP/Contents/Developer" >> "$GITHUB_ENV"
+          xcode-select -p
+          xcrun --find swiftc
           swift --version
-          xcodebuild -version || true
 
       - name: Import signing certificate
         if: env.MACOS_CERT_P12 != ''
@@ -118,7 +127,23 @@ jobs:
       - name: Build
         env:
           ICHR_VERSION: ${{ steps.version.outputs.version }}
-        run: ./build.sh ci
+        run: |
+          set -o pipefail
+          ./build.sh ci 2>&1 | tee build-console.log
+
+      - name: Failure summary
+        if: failure()
+        run: |
+          echo "===== build.log (last 800 lines) ====="
+          tail -n 800 build.log 2>/dev/null || echo "(build.log not created)"
+          echo "===== console (last 200 lines) ====="
+          tail -n 200 build-console.log 2>/dev/null || true
+          {
+            echo "### Build failed"
+            echo '```'
+            tail -n 80 build.log 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify artifacts
         run: |

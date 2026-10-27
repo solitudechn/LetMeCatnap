@@ -13,3 +13,5 @@ dist/
 
 # WorkBuddy 本地记忆（不随仓库分发）
 .workbuddy/
+build.log
+build-console.log

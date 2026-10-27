@@ -78,16 +78,15 @@ die() {
     tail -n +"$logMark" "$logFile" > "$TTY" 2>&1
     echo -e "  ${dimColor}--- end error output ---${noColor}" > "$TTY"
 
-    # On GitHub Actions, surface the compiler errors as annotations. Without
-    # this the step just says "exit code 1" and the real message is buried in
-    # a multi-thousand-line log.
+    # On GitHub Actions, also turn the compiler errors into annotations so
+    # they show up on the PR / commit without opening the raw log.
     if [ -n "${GITHUB_ACTIONS:-}" ] && [ -f "$logFile" ]; then
         tail -n +"$logMark" "$logFile" 2>/dev/null \
-            | grep -m 20 -E "error:|fatal error|Error:|No such file|not found" \
+            | grep -m 20 -E "error:|fatal error|Error:|No such file|not found|unable to find|command not found" \
             | sed -e 's/%/%25/g' -e 's/\r//g' 2>/dev/null \
             | while IFS= read -r line; do
                 echo "::error::$line"
-              done || true
+              done >&2 || true
     fi
 
     exit 1
@@ -113,11 +112,14 @@ run_step() {
     shift
 
     step "$label"
+    echo "--- $label ---" >> "$logFile"
     logMark=$(($(wc -l < "$logFile") + 1))
-    {
-        echo "--- $label ---"
-        "$func" "$@" || die "$error_msg"
-    } >> "$logFile" 2>&1
+    # Only the command output is captured: die() runs outside the redirect
+    # below, so the error summary still reaches the console in CI (where
+    # build.log is never read by a human).
+    if ! "$func" "$@" >> "$logFile" 2>&1; then
+        die "$error_msg"
+    fi
     ok
 }
 
@@ -129,6 +131,18 @@ do_init_log() {
     echo "Mode: $mode" >> "$logFile"
     echo "Signing: $can_sign" >> "$logFile"
     echo "Notarizing: $can_notarize" >> "$logFile"
+    echo "" >> "$logFile"
+
+    # Toolchain fingerprint. SwiftUI macros (@State and friends) only resolve
+    # against a full Xcode; Command Line Tools alone fails with
+    # "external macro implementation type 'SwiftUIMacros.StateMacro' could not
+    # be found". Recording this makes that failure obvious after the fact.
+    echo "--- toolchain ---" >> "$logFile"
+    echo "DEVELOPER_DIR: ${DEVELOPER_DIR:-<unset>}" >> "$logFile"
+    echo "xcode-select: $(xcode-select -p 2>&1)" >> "$logFile"
+    echo "swiftc: $(xcrun --find swiftc 2>&1)" >> "$logFile"
+    echo "swift: $(swift --version 2>&1 | head -2 | tr '\n' ' ')" >> "$logFile"
+    echo "uname: $(uname -m) / $(sw_vers -productVersion 2>&1)" >> "$logFile"
     echo "" >> "$logFile"
 }
 
