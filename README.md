@@ -42,11 +42,12 @@ The break reminder also respects full screen apps. If you're watching a movie or
 
 ## How it works
 
-1. Set your work interval (5–60 min) and break duration (20 sec–5 min)
+1. Set your work interval (5–90 min) and break duration (20 sec–10 min)
 2. A countdown appears in your menu bar
-3. When time's up, you will receive a gentle reminder to look away
-4. If you're on a call, the timer pauses automatically until you're done
-5. If you step away from your computer, the timer pauses and resets when you return
+3. When time's up, you will receive a gentle reminder to look away — or choose **Take a Break Now / 立即休息** whenever you need one
+4. Optionally take a longer break every N completed work sessions with **Pomodoro Rhythm / 番茄节奏** (manual breaks do not consume a work session)
+5. If you're on a call, the break waits until you're done
+6. If you step away from your computer, the timer pauses and resets when you return
 
 <div align="center">
   <img src="assets/menu.png" alt="iCanHazRepose menu" width="280"/>
@@ -64,7 +65,7 @@ This means it works with Zoom, Meet, FaceTime, Teams, Slack huddles, and whateve
 
 ## Smart idle detection
 
-iCanHazRepose also detects when you've stepped away from your computer. If there's no keyboard or mouse activity for 5 minutes, the timer pauses — and resets to a full work cycle when you return, since you already took a real break.
+iCanHazRepose also detects when you've stepped away from your computer. If there's no keyboard or mouse activity for 60 seconds plus your configured short-break duration, the timer pauses — and resets to a full work cycle when you return, since you already took a real break.
 
 It's smart about passive screen use too: if you're watching a video (where apps keep the display awake), the timer keeps running so you still get break reminders.
 

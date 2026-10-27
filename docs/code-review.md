@@ -92,5 +92,40 @@
 | 渐进式提醒 | `SettingsKey.progressiveReminders` · `TimerManager.updateImminentFlag()` | 剩余 1 分钟时菜单栏图标切 `hourglass` 并轻响一声；连续跳过 2 次后，下一次休息不可跳过（`skipBreak()` 内部拦截，Esc 热键一并失效） |
 | 文件日志 | `Log.swift` | 写入 `~/Library/Logs/iCanHazRepose/iCanHazRepose.log`，串行队列 + 1 MB 滚动到 `.1.log`；启动时记录配置与日志路径 |
 
-同时修掉了 P1 第 8 条（日志只有 stdout）。仍未处理：计时器累计漂移（第 6 条）——
-`remainingSeconds -= 1` 的毛病还在，做统计类功能前必须先改 deadline 计算。
+同时修掉了 P1 第 8 条（日志只有 stdout）。
+
+---
+
+## 第二轮代码级校验与修复（2026-10-27）
+
+### 新增入口
+
+- 菜单顶部新增 **立即休息 / Take a Break Now**（快捷键 `B`）：随时进入短休息；
+  不消耗番茄工作轮次、不影响下一次长休息的位置；休息中禁用，重复调用无副作用。
+- 主动手动休息会清除连续跳过计数；会议中仍会延后弹出，保持“不打断会议”的原有原则。
+
+### 本轮修复
+
+| 问题 | 修复 |
+|---|---|
+| 每秒 `-1` 造成累计漂移，长休息误差更明显 | 工作与休息均改用 wall-clock deadline，延迟 tick 会补齐而不是永久延长 |
+| 强制休息可被“重新开始计时”或会议检测绕过 | 统一状态转换；休息中禁止 restart，会议只中断非强制休息，且不计为用户跳过 |
+| 最后 1 分钟提醒在暂停恢复后失效 | 按剩余区间计算提醒状态，恢复时可重新进入提醒 |
+| 休息中修改“允许跳过”时按钮与 Esc 行为不一致 | 新增 `canSkipBreak` 作为视图、热键、状态机的唯一判断 |
+| 长/短休息设置在当前休息中变化会改变进度环总量 | 开始休息时快照 `activeBreakTotalSeconds` |
+| 结束动画期间可能重复调用 `endBreak()` | 增加 `isEndingBreak` 防重入 |
+| 关闭会议暂停后会议图标可能残留 | 同时重置 `MeetingDetector` 和 `wasInMeeting` |
+| 独立更新窗口点 Later/Skip 不关闭 | 非 sheet 情况改为 `window.close()` |
+| 检查更新期间关闭关于窗口可能强制解包崩溃 | alert 展示前检查 window；缺失图标不再 force unwrap |
+| Carbon Esc 回调 context 每次休息泄漏 | `OverlayManager` 保存并在注销 handler 后 release context |
+| 异步日志在退出时可能丢最后一条 | 增加 `Log.flush()`，退出前等待队列完成 |
+| Swift 6 主线程隔离前向兼容警告 | 更新完成后通过 `await MainActor.run` 终止应用 |
+
+### 验证结果
+
+- 13 个 Swift 源文件逐个 `swiftc -parse`：通过。
+- 两个 SwiftUI 视图以桩替换后，其余 11 个源码文件 `swiftc -typecheck`：**0 error / 0 warning**。
+- L10n 引用 70 个、菜单 selector 引用 11 个：无缺失。
+- 25 项状态行为断言全部通过：立即休息、轮次计数、长休息、强制休息、会议延后/中断、deadline 到期、暂停恢复、跳过开关等。
+- `build.sh` Bash 语法、两个 workflow YAML、Info.plist、`git diff --check`：通过。
+- 本机仍无完整 Xcode，两个 SwiftUI 视图只能做语法检查；最终完整编译仍以推送后的 CI 为准。

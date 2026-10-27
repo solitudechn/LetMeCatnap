@@ -3,7 +3,6 @@ import SwiftUI
 
 struct CompactBreakOverlayView: View {
     @ObservedObject var timerManager: TimerManager
-    @AppStorage(SettingsKey.allowSkipBreak) private var allowSkipBreak: Bool = true
     @State private var breathe = false
     @State private var appeared = false
     @State private var ringProgress: CGFloat = 0
@@ -73,7 +72,7 @@ struct CompactBreakOverlayView: View {
                 }
 
                 // Escape hint (non-clickable — mouse passes through to fullscreen app)
-                if allowSkipBreak && !timerManager.isBreakMandatory {
+                if timerManager.canSkipBreak {
                     HStack(spacing: 8) {
                         Text(L10n.skip)
                             .font(.system(size: 13, weight: .medium))

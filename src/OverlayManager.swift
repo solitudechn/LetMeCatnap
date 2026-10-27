@@ -16,6 +16,7 @@ class OverlayManager {
     private var escapeHotKeyRef: EventHotKeyRef?
     private var ctrlEscapeHotKeyRef: EventHotKeyRef?
     private var escapeEventHandlerRef: EventHandlerRef?
+    private var escapeHandlerContext: UnsafeMutableRawPointer?
 
     // MARK: - Full overlay (all screens)
 
@@ -234,6 +235,8 @@ class OverlayManager {
         if installStatus != noErr {
             Unmanaged<EscapeHandlerContext>.fromOpaque(ctxPtr).release()
             unregisterEscapeHotkey()
+        } else {
+            escapeHandlerContext = ctxPtr
         }
     }
 
@@ -249,6 +252,10 @@ class OverlayManager {
         if let handlerRef = escapeEventHandlerRef {
             RemoveEventHandler(handlerRef)
             escapeEventHandlerRef = nil
+        }
+        if let context = escapeHandlerContext {
+            Unmanaged<EscapeHandlerContext>.fromOpaque(context).release()
+            escapeHandlerContext = nil
         }
     }
 }

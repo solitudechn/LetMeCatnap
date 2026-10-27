@@ -313,7 +313,9 @@ class UpdateManager {
             stagingDir: tmpdir
         )
 
-        NSApp.terminate(nil)
+        await MainActor.run {
+            NSApp.terminate(nil)
+        }
     }
 
     // MARK: - Helpers

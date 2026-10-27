@@ -13,6 +13,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     // Menu items that need updating
     private var statusMenuItem: NSMenuItem!
     private var pauseResumeMenuItem: NSMenuItem!
+    private var takeBreakNowMenuItem: NSMenuItem!
+    private var restartMenuItem: NSMenuItem!
     private var workIntervalMenu: NSMenu!
     private var breakDurationMenu: NSMenu!
     private var pomodoroMenu: NSMenu!
@@ -84,9 +86,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         pauseResumeMenuItem.target = self
         menu.addItem(pauseResumeMenuItem)
 
-        let restartItem = NSMenuItem(title: L10n.restartTimer, action: #selector(restartTimer), keyEquivalent: "r")
-        restartItem.target = self
-        menu.addItem(restartItem)
+        takeBreakNowMenuItem = NSMenuItem(title: L10n.takeBreakNow, action: #selector(takeBreakNow), keyEquivalent: "b")
+        takeBreakNowMenuItem.target = self
+        menu.addItem(takeBreakNowMenuItem)
+
+        restartMenuItem = NSMenuItem(title: L10n.restartTimer, action: #selector(restartTimer), keyEquivalent: "r")
+        restartMenuItem.target = self
+        menu.addItem(restartMenuItem)
 
         menu.addItem(.separator())
 
@@ -239,6 +245,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         default:
             pauseResumeMenuItem.isHidden = true
         }
+        takeBreakNowMenuItem.isEnabled = timerManager.state != .onBreak
+        restartMenuItem.isEnabled = timerManager.state != .onBreak
 
         // Work interval checkmarks
         let currentWork = UserDefaults.standard.integer(forKey: SettingsKey.workDurationMinutes)
@@ -336,15 +344,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         timerManager.start()
     }
 
+    @objc private func takeBreakNow() {
+        timerManager.startBreakNow()
+    }
+
     @objc private func setWorkInterval(_ sender: NSMenuItem) {
         Log.info("Work interval changed to \(sender.tag) min")
         UserDefaults.standard.set(sender.tag, forKey: SettingsKey.workDurationMinutes)
-        if timerManager.state == .working {
-            let newDuration = timerManager.workDurationSeconds
-            if timerManager.remainingSeconds > newDuration {
-                timerManager.remainingSeconds = newDuration
-            }
-        }
+        timerManager.workDurationSettingChanged()
     }
 
     @objc private func setBreakDuration(_ sender: NSMenuItem) {
@@ -494,6 +501,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
 
     func applicationWillTerminate(_ notification: Notification) {
         Log.info("App terminated")
+        Log.flush()
     }
 
     // MARK: - Helpers

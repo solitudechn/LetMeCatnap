@@ -72,6 +72,7 @@ extension L10n {
     static var pauseTimer: String          { t("Pause Timer", "暂停计时") }
     static var resumeTimer: String         { t("Resume Timer", "继续计时") }
     static var restartTimer: String        { t("Restart Timer", "重新开始计时") }
+    static var takeBreakNow: String        { t("Take a Break Now", "立即休息") }
     static var workInterval: String        { t("Work Interval", "工作时长") }
     static var breakDuration: String       { t("Break Duration", "休息时长") }
     static var pauseDuringMeetings: String { t("Pause During Meetings", "会议中自动暂停") }
@@ -162,7 +163,7 @@ extension L10n {
 
     private static var zhBreakTips: [String] {
         [
-            "看 20 英尺外的东西 20 秒",
+            "看向约 6 米（20 英尺）外，持续 20 秒",
             "站起来转一转肩膀",
             "慢慢深呼吸三次",
             "去喝一杯水",

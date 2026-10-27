@@ -181,9 +181,13 @@ class UpdateDialogViewController: NSViewController {
     }
 
     private func dismissSheet() {
-        if let sheetWindow = view.window,
-           let parentWindow = sheetWindow.sheetParent {
-            parentWindow.endSheet(sheetWindow)
+        guard let window = view.window else { return }
+        if let parentWindow = window.sheetParent {
+            parentWindow.endSheet(window)
+        } else {
+            // Automatic update checks use a standalone window when there is no
+            // key window to attach a sheet to; Later/Skip must close it too.
+            window.close()
         }
     }
 }

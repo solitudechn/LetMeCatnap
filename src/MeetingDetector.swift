@@ -17,9 +17,13 @@ class MeetingDetector: ObservableObject {
             isInMeeting = true
             meetingSource = L10n.microphoneInUse
         } else {
-            isInMeeting = false
-            meetingSource = nil
+            reset()
         }
+    }
+
+    func reset() {
+        isInMeeting = false
+        meetingSource = nil
     }
 
     // MARK: - Camera Detection via CoreMediaIO

@@ -31,6 +31,11 @@ enum Log {
         write("ERROR", message)
     }
 
+    /// Flush writes queued before application termination.
+    static func flush() {
+        queue.sync {}
+    }
+
     // MARK: - Private
 
     private static func write(_ level: String, _ message: String) {

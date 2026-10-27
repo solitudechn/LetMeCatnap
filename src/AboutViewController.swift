@@ -330,7 +330,11 @@ class AboutViewController: NSViewController {
                     alert.messageText = L10n.alreadyLatestVersion
                     alert.alertStyle = .informational
                     alert.addButton(withTitle: L10n.ok)
-                    alert.beginSheetModal(for: self.view.window!)
+                    if let window = self.view.window {
+                        alert.beginSheetModal(for: window)
+                    } else {
+                        alert.runModal()
+                    }
                 }
             case .failure(let error):
                 let alert = NSAlert()
@@ -338,7 +342,11 @@ class AboutViewController: NSViewController {
                 alert.informativeText = error.localizedDescription
                 alert.alertStyle = .warning
                 alert.addButton(withTitle: L10n.ok)
-                alert.beginSheetModal(for: self.view.window!)
+                if let window = self.view.window {
+                    alert.beginSheetModal(for: window)
+                } else {
+                    alert.runModal()
+                }
             }
         }
     }
@@ -392,7 +400,8 @@ class AboutViewController: NSViewController {
 
     private func makeIconButton(imageName: String, url: String) -> LinkButton {
         let originalImage = NSImage(named: imageName)
-        let image = (originalImage?.copy() as? NSImage) ?? originalImage!
+        let image = (originalImage?.copy() as? NSImage)
+            ?? NSImage(size: NSSize(width: 24, height: 24))
         image.isTemplate = true
         image.size = NSSize(width: 24, height: 24)
         return LinkButton(image: image, url: url)

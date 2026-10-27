@@ -4,7 +4,6 @@ import SwiftUI
 struct BreakOverlayView: View {
     @ObservedObject var timerManager: TimerManager
     let isPrimary: Bool
-    @AppStorage(SettingsKey.allowSkipBreak) private var allowSkipBreak: Bool = true
     @State private var breathe = false
     @State private var appeared = false
     @State private var ringProgress: CGFloat = 0
@@ -98,7 +97,7 @@ struct BreakOverlayView: View {
 
                     // Skip button — hidden when progressive reminders made this
                     // break mandatory.
-                    if allowSkipBreak && !timerManager.isBreakMandatory {
+                    if timerManager.canSkipBreak {
                         Button(action: { timerManager.skipBreak() }) {
                             HStack(spacing: 10) {
                                 Text(L10n.skip)
