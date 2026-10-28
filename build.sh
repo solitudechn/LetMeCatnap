@@ -204,6 +204,9 @@ do_clean_dist() {
     rm -rf "$loc/dist/$name-dev.zip"
     rm -rf "$loc/dist/$name.dmg"
     rm -rf "$loc/dist/$name"
+    # Left behind when a run stops between `cp -R` and the cleanup at the end of
+    # `do_create_dmg`; without this it survives every later build.
+    rm -rf "$loc/dist/dmg_staging"
     mkdir -p "$loc/dist"
 }
 
