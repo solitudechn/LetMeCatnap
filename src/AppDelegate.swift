@@ -399,6 +399,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
             guard let self else { return }
             self.buildMenu()
             self.updateMenuItems()
+            // The About window builds its labels once, from L10n — repaint it
+            // if it happens to be on screen while the language changes.
+            if let window = self.aboutWindow, window.isVisible {
+                window.title = L10n.about(AppConstants.appName)
+                (window.contentViewController as? AboutViewController)?.reloadForLanguageChange()
+            }
         }
     }
 

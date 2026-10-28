@@ -90,6 +90,15 @@ class AboutViewController: NSViewController {
         setupUI()
     }
 
+    /// Every label here is baked from `L10n` when the view loads, so an open
+    /// About window would keep the previous language after a menu switch.
+    /// Rebuilding the subviews (instead of the whole controller) keeps the
+    /// window's size and position intact.
+    func reloadForLanguageChange() {
+        view.subviews.forEach { $0.removeFromSuperview() }
+        setupUI()
+    }
+
     private func setupUI() {
         let container = view
 
