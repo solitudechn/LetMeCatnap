@@ -74,7 +74,7 @@ Most break apps pause on keyboard inactivity — but "no keyboard for two minute
 
 If you never lock your screen, **Reminders → Pause When** offers the idle-based behaviour instead: pause only (`Idle for 5 Minutes`), both signals (`Screen Locks or Idle`), or never pause automatically. Idle is opt-in because it is the noisy one — five minutes without input is the threshold, so reading a document is no longer mistaken for leaving.
 
-The break screen hides its countdown after three seconds and puts the guidance front and centre — staring at a ticking number is the opposite of resting your eyes. Tap the ring to see the time left. Escape closes a break too, unless you turned off **Reminders → Allow Skip Break**.
+The break screen hides its countdown after three seconds and puts the guidance front and centre — staring at a ticking number is the opposite of resting your eyes. Tap the ring to see the time left. **Escape always closes a break** — a reminder should never be able to trap you. *Reminders → Show Skip Button* only decides whether the on-screen Skip button is there.
 
 ## Install
 

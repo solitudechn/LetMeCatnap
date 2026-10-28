@@ -84,7 +84,7 @@ struct CompactBreakOverlayView: View {
                 }
 
                 // Escape hint (non-clickable — mouse passes through to fullscreen app)
-                if timerManager.canSkipBreak {
+                if timerManager.showsSkipButton {
                     HStack(spacing: 8) {
                         Text(L10n.t(.skip))
                             .font(.system(size: 13, weight: .medium))
@@ -99,8 +99,18 @@ struct CompactBreakOverlayView: View {
                     .overlay(Capsule().stroke(.white.opacity(0.1), lineWidth: 0.5))
                     .opacity(appeared ? 1 : 0)
                     .accessibilityElement(children: .combine)
-                } else if timerManager.showsSkipHint {
-                    // Escape still works; this is only a nudge.
+                } else {
+                    // The button is hidden, but Escape still ends the break —
+                    // say so, otherwise the panel looks like a dead end.
+                    Text(L10n.t(.escapeToDismiss))
+                        .font(.system(size: 11, weight: .regular))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(0.3))
+                        .opacity(appeared ? 1 : 0)
+                }
+
+                // A nudge after repeated skips — advisory only, Escape works too.
+                if timerManager.showsSkipHint {
                     Text(L10n.t(.skipHint))
                         .font(.system(size: 11, weight: .regular))
                         .multilineTextAlignment(.center)

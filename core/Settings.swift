@@ -24,7 +24,10 @@ public final class Settings: ObservableObject {
         public static let pauseTrigger = "pauseTrigger"
         /// Legacy boolean, read once for migration.
         public static let legacyPauseWhenLocked = "pauseWhenLocked"
-        public static let allowSkipBreak = "allowSkipBreak"
+        /// Storage key of the skip button preference. The string is kept from
+        /// the original "allow skip break" switch so existing installs keep
+        /// their choice; the meaning changed (see `showSkipButton`).
+        public static let showSkipButton = "allowSkipBreak"
         public static let progressiveReminders = "progressiveReminders"
         public static let muteSounds = "muteSounds"
         public static let hideMenuBarTimer = "hideMenuBarTimer"
@@ -39,7 +42,7 @@ public final class Settings: ObservableObject {
             pauseDuringMeetings,
             pauseTrigger,
             legacyPauseWhenLocked,
-            allowSkipBreak,
+            showSkipButton,
             progressiveReminders,
             muteSounds,
             hideMenuBarTimer,
@@ -58,7 +61,7 @@ public final class Settings: ObservableObject {
         public static let longBreakSeconds = 900
         public static let pauseDuringMeetings = true
         public static let pauseTrigger: PauseTrigger = .lockScreen
-        public static let allowSkipBreak = true
+        public static let showSkipButton = true
         public static let progressiveReminders = true
         public static let muteSounds = false
         public static let hideMenuBarTimer = false
@@ -76,7 +79,11 @@ public final class Settings: ObservableObject {
 
     @Published public private(set) var pauseDuringMeetings: Bool
     @Published public private(set) var pauseTrigger: PauseTrigger
-    @Published public private(set) var allowSkipBreak: Bool
+    /// Whether the break overlay offers an on-screen "Skip" button.
+    ///
+    /// Escape always dismisses a break — a reminder must never trap the user —
+    /// so this only controls the visible button.
+    @Published public private(set) var showSkipButton: Bool
     @Published public private(set) var progressiveReminders: Bool
     @Published public private(set) var muteSounds: Bool
     @Published public private(set) var hideMenuBarTimer: Bool
@@ -119,8 +126,8 @@ public final class Settings: ObservableObject {
         pauseDuringMeetings = Self.boolean(
             defaults, Key.pauseDuringMeetings, fallback: Defaults.pauseDuringMeetings
         )
-        allowSkipBreak = Self.boolean(
-            defaults, Key.allowSkipBreak, fallback: Defaults.allowSkipBreak
+        showSkipButton = Self.boolean(
+            defaults, Key.showSkipButton, fallback: Defaults.showSkipButton
         )
         progressiveReminders = Self.boolean(
             defaults, Key.progressiveReminders, fallback: Defaults.progressiveReminders
@@ -197,8 +204,8 @@ public final class Settings: ObservableObject {
         defaults.set(value.rawValue, forKey: Key.pauseTrigger)
     }
 
-    public func setAllowSkipBreak(_ value: Bool) {
-        allowSkipBreak = persist(value, Key.allowSkipBreak)
+    public func setShowSkipButton(_ value: Bool) {
+        showSkipButton = persist(value, Key.showSkipButton)
     }
 
     public func setProgressiveReminders(_ value: Bool) {

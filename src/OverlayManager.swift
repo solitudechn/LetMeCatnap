@@ -147,15 +147,12 @@ class OverlayManager {
     }
 
     private func installKeyMonitor(timerManager: TimerManager) {
-        // Read the setting from the timer manager's own `Settings` instance
-        // instead of the global singleton: the two can differ, and the hotkey
-        // has to match what the overlay will actually offer.
-        let allowSkip = timerManager.settings.allowSkipBreak
-        guard allowSkip else { return }
-
+        // Escape is always registered: a break must never be able to trap the
+        // user, so the shortcut works even when the on-screen skip button is
+        // hidden by the "Show Skip Button" preference.
         registerEscapeHotkey { [weak timerManager] in
             DispatchQueue.main.async {
-                timerManager?.skipBreak()
+                timerManager?.skipBreak(viaKeyboard: true)
             }
         }
     }

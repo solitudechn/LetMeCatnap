@@ -66,7 +66,8 @@ public enum LocKey: String, CaseIterable, Sendable {
     case triggerIdle
     case triggerBoth
     case triggerNever
-    case allowSkipBreak
+    case showSkipButton
+    case escapeToDismiss
     case muteSounds
     case hideMenuBarTimer
     case launchAtLogin

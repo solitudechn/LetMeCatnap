@@ -181,20 +181,16 @@ class AboutViewController: NSViewController {
 
         let boxiconsLink = LinkButton(title: "boxicons", url: AppConstants.boxiconsURL)
 
-        // Social link buttons
-        let kofiButton = makeIconButton(imageName: "bx-kofi", url: AppConstants.kofiURL)
+        // Link to this fork. The upstream project's own social links (Ko-fi,
+        // Discord, Reddit) are deliberately not repeated here: in a fork they
+        // point at someone else's donation and community pages.
         let githubButton = makeIconButton(imageName: "bx-github", url: BundleIdentity.repositoryURL)
-        let redditButton = makeIconButton(imageName: "bx-reddit", url: AppConstants.redditURL)
-        let discordButton = makeIconButton(imageName: "bx-discord", url: AppConstants.discordURL)
 
         let socialStack = NSStackView()
         socialStack.orientation = .horizontal
         socialStack.spacing = 16
         socialStack.translatesAutoresizingMaskIntoConstraints = false
-        socialStack.addView(kofiButton, in: .center)
         socialStack.addView(githubButton, in: .center)
-        socialStack.addView(redditButton, in: .center)
-        socialStack.addView(discordButton, in: .center)
 
         // Add all subviews to left panel
         let leftSubviews: [NSView] = [

@@ -13,8 +13,5 @@ enum AppConstants {
     /// Where the code this app is based on lives.
     static let upstreamRepoURL = "https://github.com/deseven/iCanHazRepose"
     static let originalRepoURL = "https://github.com/fikrikarim/repose"
-    static let kofiURL = "https://ko-fi.com/deseven"
-    static let redditURL = "https://www.reddit.com/r/iCanHazApps"
-    static let discordURL = "https://discord.gg/YE9KyTXRPt"
     static let boxiconsURL = "https://boxicons.com"
 }

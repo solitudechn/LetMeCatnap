@@ -80,10 +80,13 @@ class TimerManager: ObservableObject {
         return isLongBreak ? longBreakSeconds : breakDurationSeconds
     }
 
-    /// Skipping is always allowed while a break is on screen: a reminder must
-    /// never be stronger than the work it interrupts.
-    var canSkipBreak: Bool {
-        state == .onBreak && settings.allowSkipBreak
+    /// Whether the break overlay offers an on-screen "Skip" button.
+    ///
+    /// Escape always dismisses a break — a reminder must never be stronger than
+    /// the work it interrupts — so this preference only controls the visible
+    /// button, never whether the user can get out.
+    var showsSkipButton: Bool {
+        state == .onBreak && settings.showSkipButton
     }
 
     /// After repeated skips the overlay shows a nudge instead of silently
@@ -330,10 +333,15 @@ class TimerManager: ObservableObject {
         updateImminentFlag()
     }
 
-    func skipBreak() {
+    /// Dismisses the break.
+    ///
+    /// `viaKeyboard` is the Escape shortcut, which always works. The on-screen
+    /// button only exists when `showsSkipButton` is on, so the button path has
+    /// to respect the preference.
+    func skipBreak(viaKeyboard: Bool = false) {
         guard state == .onBreak else { return }
-        guard canSkipBreak else {
-            Log.info("Break skip rejected: skipping is disabled in settings")
+        guard viaKeyboard || showsSkipButton else {
+            Log.info("Break skip ignored: the skip button is hidden")
             return
         }
         Log.info("Break overlay closed: user cancelled")

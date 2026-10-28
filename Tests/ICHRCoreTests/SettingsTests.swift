@@ -29,7 +29,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(settings.longBreakSeconds, 900)
         XCTAssertTrue(settings.pauseDuringMeetings)
         XCTAssertEqual(settings.pauseTrigger, .lockScreen)
-        XCTAssertTrue(settings.allowSkipBreak)
+        XCTAssertTrue(settings.showSkipButton)
         XCTAssertTrue(settings.progressiveReminders)
         XCTAssertFalse(settings.muteSounds)
         XCTAssertFalse(settings.hideMenuBarTimer)
@@ -145,7 +145,7 @@ final class SettingsTests: XCTestCase {
         defer { legacy.removePersistentDomain(forName: legacySuite) }
 
         legacy.set(45, forKey: Settings.Key.workMinutes)
-        legacy.set(false, forKey: Settings.Key.allowSkipBreak)
+        legacy.set(false, forKey: Settings.Key.showSkipButton)
         legacy.set(AppLanguage.chinese.rawValue, forKey: L10n.languageDefaultsKey)
 
         XCTAssertTrue(
@@ -153,18 +153,25 @@ final class SettingsTests: XCTestCase {
             "values stored under the old bundle id should be copied"
         )
         XCTAssertEqual(defaults.integer(forKey: Settings.Key.workMinutes), 45)
-        XCTAssertEqual(defaults.object(forKey: Settings.Key.allowSkipBreak) as? Bool, false)
+        XCTAssertEqual(defaults.object(forKey: Settings.Key.showSkipButton) as? Bool, false)
         XCTAssertEqual(defaults.string(forKey: L10n.languageDefaultsKey), "zh")
 
         // The migrated values must survive into a live Settings instance.
         let settings = Settings(defaults: defaults)
         XCTAssertEqual(settings.workMinutes, 45)
-        XCTAssertFalse(settings.allowSkipBreak)
+        XCTAssertFalse(settings.showSkipButton)
 
         // Running it again must not overwrite anything.
         defaults.set(25, forKey: Settings.Key.workMinutes)
         XCTAssertFalse(Settings.migratePreferences(into: defaults, from: [legacySuite]))
         XCTAssertEqual(defaults.integer(forKey: Settings.Key.workMinutes), 25)
+    }
+
+    func testSkipButtonKeepsItsHistoricalStorageKey() {
+        // The preference changed meaning (it no longer forbids skipping, it only
+        // hides the button), but existing installs must keep their choice, so
+        // the key on disk must not change.
+        XCTAssertEqual(Settings.Key.showSkipButton, "allowSkipBreak")
     }
 
     @MainActor

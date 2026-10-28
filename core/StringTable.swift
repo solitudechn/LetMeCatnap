@@ -23,7 +23,7 @@ enum StringTable {
         .triggerIdle: Translation("Idle for 5 Minutes", "空闲 5 分钟时"),
         .triggerBoth: Translation("Screen Locks or Idle", "锁屏或空闲时"),
         .triggerNever: Translation("Never", "从不"),
-        .allowSkipBreak: Translation("Allow Skip Break", "允许跳过休息"),
+        .showSkipButton: Translation("Show Skip Button", "显示跳过按钮"),
         .muteSounds: Translation("Mute Sounds", "静音"),
         .hideMenuBarTimer: Translation("Hide Timer in Menu Bar", "隐藏菜单栏倒计时"),
         .launchAtLogin: Translation("Launch at Login", "开机启动"),
@@ -75,6 +75,8 @@ enum StringTable {
         .skip: Translation("Skip", "跳过"),
         // Key names are not translated; both sides are identical on purpose.
         .skipKeys: Translation("Esc / ⌃Esc", "Esc / ⌃Esc"),
+        // Shown when the on-screen skip button is hidden: Escape always works.
+        .escapeToDismiss: Translation("Press Esc to dismiss", "按 Esc 退出"),
         .showRemaining: Translation("Tap the ring to see the time left", "点一下圆环可查看剩余时间"),
         // Advisory only — the break can still be skipped with Esc.
         .skipHint: Translation(

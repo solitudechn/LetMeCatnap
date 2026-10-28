@@ -136,7 +136,7 @@ struct BreakOverlayView: View {
                     }
 
                     // Skip button
-                    if timerManager.canSkipBreak {
+                    if timerManager.showsSkipButton {
                         Button(action: { timerManager.skipBreak() }) {
                             HStack(spacing: 10) {
                                 Text(L10n.t(.skip))
@@ -162,6 +162,14 @@ struct BreakOverlayView: View {
                                 NSCursor.pop()
                             }
                         }
+                    } else {
+                        // The button can be hidden, but Escape always ends the
+                        // break — without this the full-screen overlay would
+                        // look like a dead end.
+                        Text(L10n.t(.escapeToDismiss))
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.3))
+                            .opacity(appeared ? 1 : 0)
                     }
 
                     Spacer()

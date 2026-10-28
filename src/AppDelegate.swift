@@ -18,7 +18,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     /// Boolean preferences, encoded as menu tags so one action can toggle them.
     private enum BoolSetting: Int, CaseIterable {
         case pauseDuringMeetings
-        case allowSkipBreak
+        case showSkipButton
         case progressiveReminders
         case muteSounds
         case hideMenuBarTimer
@@ -26,7 +26,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         var title: String {
             switch self {
             case .pauseDuringMeetings: return L10n.t(.pauseDuringMeetings)
-            case .allowSkipBreak: return L10n.t(.allowSkipBreak)
+            case .showSkipButton: return L10n.t(.showSkipButton)
             case .progressiveReminders: return L10n.t(.progressiveReminders)
             case .muteSounds: return L10n.t(.muteSounds)
             case .hideMenuBarTimer: return L10n.t(.hideMenuBarTimer)
@@ -72,7 +72,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         Log.info("App started")
         Log.info("Log file: \(Log.fileURL.path)")
         Log.info(
-            "Config: work=\(settings.workMinutes)min, break=\(settings.breakSeconds)s, pauseDuringMeetings=\(settings.pauseDuringMeetings), pauseTrigger=\(settings.pauseTrigger), allowSkipBreak=\(settings.allowSkipBreak), muteSounds=\(settings.muteSounds), launchAtLogin=\(SMAppService.mainApp.status == .enabled)"
+            "Config: work=\(settings.workMinutes)min, break=\(settings.breakSeconds)s, pauseDuringMeetings=\(settings.pauseDuringMeetings), pauseTrigger=\(settings.pauseTrigger), showSkipButton=\(settings.showSkipButton), muteSounds=\(settings.muteSounds), launchAtLogin=\(SMAppService.mainApp.status == .enabled)"
         )
         Log.info(
             "Rhythm: longBreakEvery=\(settings.longBreakEvery), longBreak=\(settings.longBreakSeconds)s, progressiveReminders=\(settings.progressiveReminders)"
@@ -414,7 +414,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     private func boolValue(for setting: BoolSetting) -> Bool {
         switch setting {
         case .pauseDuringMeetings: return settings.pauseDuringMeetings
-        case .allowSkipBreak: return settings.allowSkipBreak
+        case .showSkipButton: return settings.showSkipButton
         case .progressiveReminders: return settings.progressiveReminders
         case .muteSounds: return settings.muteSounds
         case .hideMenuBarTimer: return settings.hideMenuBarTimer
@@ -426,8 +426,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         case .pauseDuringMeetings:
             settings.setPauseDuringMeetings(value)
             timerManager.pauseDuringMeetingsSettingChanged(enabled: value)
-        case .allowSkipBreak:
-            settings.setAllowSkipBreak(value)
+        case .showSkipButton:
+            settings.setShowSkipButton(value)
         case .progressiveReminders:
             settings.setProgressiveReminders(value)
         case .muteSounds:
