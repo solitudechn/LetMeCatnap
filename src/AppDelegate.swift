@@ -101,6 +101,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
             ofSize: NSFont.systemFontSize, weight: .regular)
 
         showsWelcome = !settings.hasCompletedWelcome
+        installMainMenu()
         buildMenu()
         startStatusBarTimer()
         Updater.shared.start()
@@ -116,6 +117,85 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     }
 
     // MARK: - Menu Construction
+
+    /// The main menu.
+    ///
+    /// A menu bar app runs as an accessory, so this is invisible most of the
+    /// time — but opening the About window switches the app to `.regular`, and
+    /// at that point macOS shows whatever is in `NSApp.mainMenu`. Without one
+    /// the menu bar is empty and ⌘Q / ⌘C / ⌘W stop working in that window,
+    /// which is exactly what a hand-written AppKit entry point gives you.
+    private func installMainMenu() {
+        let appMenu = NSMenu()
+        appMenu.addItem(
+            withTitle: L10n.t(.aboutFormat, AppConstants.appName),
+            action: #selector(showAbout),
+            keyEquivalent: ""
+        ).target = self
+        appMenu.addItem(.separator())
+        appMenu.addItem(
+            withTitle: L10n.t(.hideAppFormat, AppConstants.appName),
+            action: #selector(NSApplication.hide(_:)),
+            keyEquivalent: "h"
+        )
+        let hideOthers = appMenu.addItem(
+            withTitle: L10n.t(.hideOthers),
+            action: #selector(NSApplication.hideOtherApplications(_:)),
+            keyEquivalent: "h"
+        )
+        hideOthers.keyEquivalentModifierMask = [.command, .option]
+        appMenu.addItem(
+            withTitle: L10n.t(.showAll),
+            action: #selector(NSApplication.unhideAllApplications(_:)),
+            keyEquivalent: ""
+        )
+        appMenu.addItem(.separator())
+        appMenu.addItem(
+            withTitle: L10n.t(.quitFormat, AppConstants.appName),
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        )
+
+        let editMenu = NSMenu(title: L10n.t(.menuEdit))
+        editMenu.addItem(withTitle: L10n.t(.undo), action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = editMenu.addItem(withTitle: L10n.t(.redo), action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: L10n.t(.cut), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: L10n.t(.copy), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: L10n.t(.paste), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(
+            withTitle: L10n.t(.selectAll),
+            action: #selector(NSText.selectAll(_:)),
+            keyEquivalent: "a"
+        )
+
+        let windowMenu = NSMenu(title: L10n.t(.menuWindow))
+        windowMenu.addItem(
+            withTitle: L10n.t(.minimize),
+            action: #selector(NSWindow.performMiniaturize(_:)),
+            keyEquivalent: "m"
+        )
+        windowMenu.addItem(
+            withTitle: L10n.t(.close),
+            action: #selector(NSWindow.performClose(_:)),
+            keyEquivalent: "w"
+        )
+
+        let mainMenu = NSMenu()
+        let appItem = NSMenuItem()
+        appItem.submenu = appMenu
+        mainMenu.addItem(appItem)
+        let editItem = NSMenuItem()
+        editItem.submenu = editMenu
+        mainMenu.addItem(editItem)
+        let windowItem = NSMenuItem()
+        windowItem.submenu = windowMenu
+        mainMenu.addItem(windowItem)
+
+        NSApp.mainMenu = mainMenu
+        NSApp.windowsMenu = windowMenu
+    }
 
     private func buildMenu() {
         let menu = NSMenu()
@@ -619,6 +699,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         window.title = L10n.t(.aboutFormat, AppConstants.appName)
         window.setContentSize(NSSize(width: 700, height: 520))
         window.isReleasedWhenClosed = false
+        // A menu bar app must not greet you with a window it did not ask for.
+        // Without this, macOS restores the About window on the next launch
+        // after the app was quit while it was open.
+        window.isRestorable = false
         window.center()
         window.delegate = self
 

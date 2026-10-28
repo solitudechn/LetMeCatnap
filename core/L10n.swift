@@ -125,10 +125,26 @@ public enum LocKey: String, CaseIterable, Sendable {
     case checkForUpdates
     case checkForUpdatesMenu
     case createdBy
+    case upstreamBy
     case originalCodeBy
     case iconsBy
-    case localizedBy
     case licenseUnavailable
+
+    // Main menu — only visible while the About window is open, because the
+    // app is an accessory (menu bar only) the rest of the time.
+    case menuEdit
+    case menuWindow
+    case hideAppFormat
+    case hideOthers
+    case showAll
+    case undo
+    case redo
+    case cut
+    case copy
+    case paste
+    case selectAll
+    case minimize
+    case close
 }
 
 /// Bilingual string lookup.

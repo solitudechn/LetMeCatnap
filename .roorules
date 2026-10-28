@@ -25,6 +25,9 @@ Layout:
 - `docs/` — `releasing.md` only: the maintainer's release manual and the known issues that
   affect shipping. There is no running audit log — keep it that way; a file that accumulates
   every review round ends up arguing against itself.
+- `README.md` is the English README and `README.zh-CN.md` the Chinese one. They are full
+  translations of each other, not summaries: a change to one goes into the other in the same
+  commit. Keep Chinese out of `README.md` except for the language switcher label.
 
 Verify before calling anything done:
 - `./scripts/verify.sh` — the whole gate (add `CATNAP_SWIFT_FLAGS=--disable-sandbox` when
@@ -37,8 +40,11 @@ Verify before calling anything done:
   This is also the **only** check that covers `TimerManager.perform(_:)`: the effect → window /
   sound / log mapping has no unit test (the state machine does). Change it, then run a real
   cycle with a short interval and read the log.
-- `assets/menu.png` and `assets/break-overlay.png` are from the 1.0.x UI. Treat them as
-  placeholders until someone with screen-recording permission re-captures them.
+- `assets/menu.png` and `assets/break-overlay.png` are real captures of the current UI (menu
+  in English, overlay at the start of a break so the ring and countdown are visible). Re-capture
+  them by launching the app with screen-recording permission: the menu opens by itself when
+  `hasCompletedWelcome` is unset, and the overlay appears after a short work interval.
+  `screencapture -l <windowID>` grabs either window on its own, with no desktop behind it.
 
 Rules of thumb:
 - Every user-visible string is a `LocKey` case plus an entry in `core/StringTable.swift`;
@@ -68,6 +74,10 @@ Rules of thumb:
 - The repository slug appears in exactly two places — `BundleIdentity.repository` and
   `Info.plist`'s `SUFeedURL` — and a test fails when they disagree. Changing one without the
   other points the updater at a 404, which nobody notices until the next release.
+- The entry point is AppKit (`CatnapMain` in `src/CatnapApp.swift`), not a SwiftUI `App`.
+  A SwiftUI `App` would need a scene only to satisfy the protocol, and that unused `Settings`
+  scene opens itself as a blank window on launch. `AppDelegate.installMainMenu()` supplies the
+  menu the About window needs once it flips the app to `.regular`.
 - Style is enforced by `.swift-format` (4 spaces, 110 columns). Run
   `swift format --in-place --recursive src core Tests` instead of hand-aligning.
 

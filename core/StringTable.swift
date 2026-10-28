@@ -97,11 +97,26 @@ enum StringTable {
         // ── About window ────────────────────────────────────────────
         .checkForUpdates: Translation("check for updates", "检查更新"),
         .checkForUpdatesMenu: Translation("Check for Updates…", "检查更新…"),
-        .createdBy: Translation("created by", "作者"),
-        .originalCodeBy: Translation("original code by", "原作者"),
-        .iconsBy: Translation("icons by", "图标来源"),
-        .localizedBy: Translation("Chinese localization by", "简体中文汉化"),
+        .createdBy: Translation("Author", "作者"),
+        .upstreamBy: Translation("Upstream author", "上游作者"),
+        .originalCodeBy: Translation("Original code", "原始代码"),
+        .iconsBy: Translation("Icons", "图标"),
         .licenseUnavailable: Translation("License text not available.", "许可证文本不可用。"),
+
+        // ── Main menu (only visible while the About window is open) ──
+        .menuEdit: Translation("Edit", "编辑"),
+        .menuWindow: Translation("Window", "窗口"),
+        .hideAppFormat: Translation("Hide %@", "隐藏 %@"),
+        .hideOthers: Translation("Hide Others", "隐藏其他"),
+        .showAll: Translation("Show All", "显示全部"),
+        .undo: Translation("Undo", "撤销"),
+        .redo: Translation("Redo", "重做"),
+        .cut: Translation("Cut", "剪切"),
+        .copy: Translation("Copy", "拷贝"),
+        .paste: Translation("Paste", "粘贴"),
+        .selectAll: Translation("Select All", "全选"),
+        .minimize: Translation("Minimize", "最小化"),
+        .close: Translation("Close", "关闭"),
     ]
 
     /// Rotated one per break. Same order in both arrays.

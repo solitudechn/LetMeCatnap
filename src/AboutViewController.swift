@@ -140,19 +140,31 @@ class AboutViewController: NSViewController {
             action: #selector(checkForUpdatesClicked)
         )
 
-        // "created by" section
+        // "Author" section — the person maintaining this build. The upstream
+        // author gets its own line below; calling deseven "the author" of an
+        // app that has its own name, icon, updater and behaviour would be
+        // misleading.
         let createdByLabel = NSTextField(labelWithString: L10n.t(.createdBy))
         createdByLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .bold)
         createdByLabel.textColor = .secondaryLabelColor
         createdByLabel.alignment = .center
         createdByLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        // Points at the upstream repository rather than a marketing site: for
-        // someone running the fork, "where does this app come from" is the
+        let authorLink = LinkButton(title: "solitudechn", url: BundleIdentity.repositoryURL)
+
+        // "Upstream author" section — where the code this app grew out of
+        // lives. The link goes to the repository rather than a marketing site:
+        // for someone running this app, "where does it come from" is the
         // useful question, and the answer is the source.
+        let upstreamByLabel = NSTextField(labelWithString: L10n.t(.upstreamBy))
+        upstreamByLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .bold)
+        upstreamByLabel.textColor = .secondaryLabelColor
+        upstreamByLabel.alignment = .center
+        upstreamByLabel.translatesAutoresizingMaskIntoConstraints = false
+
         let desevenLink = LinkButton(title: "deseven", url: AppConstants.upstreamRepoURL)
 
-        // "original code by" section
+        // "Original code" section
         let originalCodeByLabel = NSTextField(labelWithString: L10n.t(.originalCodeBy))
         originalCodeByLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .bold)
         originalCodeByLabel.textColor = .secondaryLabelColor
@@ -160,17 +172,6 @@ class AboutViewController: NSViewController {
         originalCodeByLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let fikriLink = LinkButton(title: "Fikri Karim", url: AppConstants.originalRepoURL)
-
-        // "Chinese localization by" section — this fork's own credit. MIT does not
-        // require it, but it is the community convention and it tells users where
-        // the 简体中文 interface came from.
-        let localizedByLabel = NSTextField(labelWithString: L10n.t(.localizedBy))
-        localizedByLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .bold)
-        localizedByLabel.textColor = .secondaryLabelColor
-        localizedByLabel.alignment = .center
-        localizedByLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        let localizerLink = LinkButton(title: "solitudechn", url: BundleIdentity.repositoryURL)
 
         // "icons by" section
         let iconsByLabel = NSTextField(labelWithString: L10n.t(.iconsBy))
@@ -181,9 +182,9 @@ class AboutViewController: NSViewController {
 
         let boxiconsLink = LinkButton(title: "boxicons", url: AppConstants.boxiconsURL)
 
-        // Link to this fork. The upstream project's own social links (Ko-fi,
-        // Discord, Reddit) are deliberately not repeated here: in a fork they
-        // point at someone else's donation and community pages.
+        // Link to this project. The upstream project's own social links (Ko-fi,
+        // Discord, Reddit) are deliberately not repeated here: they point at
+        // someone else's donation and community pages.
         let githubButton = makeIconButton(imageName: "bx-github", url: BundleIdentity.repositoryURL)
 
         let socialStack = NSStackView()
@@ -195,9 +196,9 @@ class AboutViewController: NSViewController {
         // Add all subviews to left panel
         let leftSubviews: [NSView] = [
             iconImageView, nameLabel, versionLabel, checkUpdatesButton,
-            createdByLabel, desevenLink,
+            createdByLabel, authorLink,
+            upstreamByLabel, desevenLink,
             originalCodeByLabel, fikriLink,
-            localizedByLabel, localizerLink,
             iconsByLabel, boxiconsLink,
             socialStack,
         ]
@@ -229,16 +230,24 @@ class AboutViewController: NSViewController {
             checkUpdatesButton.topAnchor.constraint(equalTo: versionLabel.bottomAnchor, constant: tightGap),
             checkUpdatesButton.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
-            // "created by"
+            // "Author"
             createdByLabel.topAnchor.constraint(
                 equalTo: checkUpdatesButton.bottomAnchor, constant: sectionGap),
             createdByLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
+            // author link
+            authorLink.topAnchor.constraint(equalTo: createdByLabel.bottomAnchor, constant: tightGap),
+            authorLink.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
+
+            // "Upstream author"
+            upstreamByLabel.topAnchor.constraint(equalTo: authorLink.bottomAnchor, constant: sectionGap),
+            upstreamByLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
+
             // deseven link
-            desevenLink.topAnchor.constraint(equalTo: createdByLabel.bottomAnchor, constant: tightGap),
+            desevenLink.topAnchor.constraint(equalTo: upstreamByLabel.bottomAnchor, constant: tightGap),
             desevenLink.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
-            // "original code by"
+            // "Original code"
             originalCodeByLabel.topAnchor.constraint(equalTo: desevenLink.bottomAnchor, constant: sectionGap),
             originalCodeByLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
@@ -246,16 +255,8 @@ class AboutViewController: NSViewController {
             fikriLink.topAnchor.constraint(equalTo: originalCodeByLabel.bottomAnchor, constant: tightGap),
             fikriLink.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
-            // "Chinese localization by"
-            localizedByLabel.topAnchor.constraint(equalTo: fikriLink.bottomAnchor, constant: sectionGap),
-            localizedByLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
-
-            // localizer link
-            localizerLink.topAnchor.constraint(equalTo: localizedByLabel.bottomAnchor, constant: tightGap),
-            localizerLink.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
-
-            // "icons by"
-            iconsByLabel.topAnchor.constraint(equalTo: localizerLink.bottomAnchor, constant: sectionGap),
+            // "Icons"
+            iconsByLabel.topAnchor.constraint(equalTo: fikriLink.bottomAnchor, constant: sectionGap),
             iconsByLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
             // boxicons link
