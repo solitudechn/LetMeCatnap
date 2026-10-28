@@ -11,8 +11,8 @@ import Sparkle
 /// check leaves a trace the user can send in.
 ///
 /// Contract with the release pipeline (see `docs/releasing.md`): every release
-/// must publish a signed `appcast.xml`, an `LetMeCatnap.zip` of the same build, and the
-/// EdDSA signature in the appcast must match `SUPublicEDKey` in `Info.plist`.
+/// must publish a signed `appcast.xml`, a `LetMeCatnap.zip` of the same build,
+/// and the EdDSA signature in the appcast must match `SUPublicEDKey` in `Info.plist`.
 @MainActor
 final class Updater: NSObject, SPUUpdaterDelegate {
     static let shared = Updater()
