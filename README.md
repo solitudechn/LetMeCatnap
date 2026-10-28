@@ -92,8 +92,9 @@ The download is not notarized, so the first launch may be blocked by Gatekeeper
 xattr -dr com.apple.quarantine /Applications/LetMeCatnap.app
 ```
 
-**Dev** build — every push to `main` is compiled by CI; grab the artifact from the
-[latest CI run](https://github.com/solitudechn/LetMeCatnap/actions/workflows/ci.yml).
+**Dev** build — built on demand rather than on every push: open the
+[CI workflow](https://github.com/solitudechn/LetMeCatnap/actions/workflows/ci.yml),
+choose *Run workflow*, then download the artifact from the run.
 *(Only use this if you need unreleased functionality or want to help with testing.)*
 
 ### Build from source

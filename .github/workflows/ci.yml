@@ -1,12 +1,14 @@
 name: CI
 
-# Builds the app on every push / pull request so compile errors never reach main.
-# Releases are built by release.yml when a tag is pushed.
+# Compiles the app on demand and on pull requests.
+#
+# Pushing to main deliberately does not trigger this: the only build that has to
+# exist is the release, and release.yml produces it when a tag is pushed — after
+# running the same tests, localization and formatting checks first. Queueing a
+# full macOS build for every commit bought nothing but a longer wait before
+# tagging. Use "Run workflow" when you want a build without publishing.
 
 on:
-  push:
-    branches: [main]
-    tags-ignore: ["**"]
   pull_request:
   workflow_dispatch:
 

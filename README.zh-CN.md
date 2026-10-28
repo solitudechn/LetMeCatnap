@@ -88,8 +88,9 @@ LetMeCatnap 直接看硬件。用 CoreMediaIO 查摄像头有没有被占用，�
 xattr -dr com.apple.quarantine /Applications/LetMeCatnap.app
 ```
 
-**开发版**——每次推送到 `main` 都会由 CI 编译，产物在
-[最近一次 CI 运行](https://github.com/solitudechn/LetMeCatnap/actions/workflows/ci.yml) 里。
+**开发版**——不随每次推送构建，需要时手动触发：打开
+[CI 工作流](https://github.com/solitudechn/LetMeCatnap/actions/workflows/ci.yml)，
+点 **Run workflow**，跑完从运行页面下载产物。
 *（只有想尝鲜或帮忙测试时才建议用）*
 
 ### 从源码构建
