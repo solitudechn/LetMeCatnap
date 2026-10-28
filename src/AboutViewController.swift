@@ -124,8 +124,19 @@ class AboutViewController: NSViewController {
 
         let nameLabel = NSTextField(labelWithString: appName)
         nameLabel.font = NSFont.systemFont(ofSize: 18, weight: .bold)
+        nameLabel.textColor = .labelColor
         nameLabel.alignment = .center
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        // The Chinese name sits under the Latin one rather than replacing it:
+        // the bundle, the update feed and the download are all called
+        // LetMeCatnap, so hiding that would make the window disagree with the
+        // file the user just dragged into Applications.
+        let chineseNameLabel = NSTextField(labelWithString: AppConstants.appNameChinese)
+        chineseNameLabel.font = NSFont.systemFont(ofSize: 13)
+        chineseNameLabel.textColor = .secondaryLabelColor
+        chineseNameLabel.alignment = .center
+        chineseNameLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let versionLabel = NSTextField(labelWithString: appVersion)
         versionLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
@@ -211,7 +222,7 @@ class AboutViewController: NSViewController {
 
         // Add all subviews to left panel
         let leftSubviews: [NSView] = [
-            iconImageView, nameLabel, versionLabel, checkUpdatesButton,
+            iconImageView, nameLabel, chineseNameLabel, versionLabel, checkUpdatesButton,
             createdByLabel, authorLink,
             upstreamByLabel, desevenLink,
             originalCodeByLabel, fikriLink,
@@ -239,8 +250,13 @@ class AboutViewController: NSViewController {
             nameLabel.topAnchor.constraint(equalTo: iconImageView.bottomAnchor, constant: 6),
             nameLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
+            // Chinese name
+            chineseNameLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: tightGap),
+            chineseNameLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
+
             // Version
-            versionLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: tightGap),
+            versionLabel.topAnchor.constraint(
+                equalTo: chineseNameLabel.bottomAnchor, constant: tightGap),
             versionLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
             // Check for updates

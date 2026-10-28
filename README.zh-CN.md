@@ -1,6 +1,7 @@
 <div align="center">
   <img src="assets/icon.png" width="128" height="128" alt="LetMeCatnap 图标"/>
   <h1>LetMeCatnap</h1>
+  <p><em>我要小喵一下</em></p>
   <p><strong>该休息就休息，开会的时候不打扰。</strong></p>
   <a href="https://github.com/solitudechn/LetMeCatnap/releases/latest/download/LetMeCatnap.dmg">
     <img src="assets/download-button.svg" alt="下载 macOS 版">
@@ -38,6 +39,8 @@
 <br/>
 
 LetMeCatnap 住在菜单栏里，倒数你的工作间隔，时间到了就把屏幕压暗，提醒你看看别处。休息结束，下一轮自动开始。
+
+名字就是**「我要小喵一下」**——干一会儿活，再让眼睛眯一下，也就是这么回事。
 
 和其他休息提醒最大的不同：**它会发现你正在开会，然后安静地等到会议结束。** 不需要连日历，也不需要为每个应用单独配置——摄像头或麦克风被占用，它就知道你在通话。
 

@@ -1,6 +1,7 @@
 <div align="center">
   <img src="assets/icon.png" width="128" height="128" alt="LetMeCatnap icon"/>
   <h1>LetMeCatnap</h1>
+  <p><em>我要小喵一下</em></p>
   <p><strong>Take breaks from your screen. Without interrupting your meetings.</strong></p>
   <a href="https://github.com/solitudechn/LetMeCatnap/releases/latest/download/LetMeCatnap.dmg">
     <img src="assets/download-button.svg" alt="Download for Mac">
@@ -41,6 +42,8 @@
 <br/>
 
 LetMeCatnap lives in your menu bar, counts down your work interval, and dims your screen when it's time to rest your eyes. When the break ends, the cycle starts again.
+
+The name is **我要小喵一下** — roughly "let me catnap for a bit" — which is the whole plan: work for a while, then let your eyes nap.
 
 The difference from every other break reminder: **LetMeCatnap detects when you're in a meeting and stays out of your way.** No calendar integration, no app-specific setup. If your camera or mic is active, it knows you're on a call and waits.
 
