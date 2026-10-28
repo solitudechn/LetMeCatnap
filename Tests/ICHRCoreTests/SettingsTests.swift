@@ -125,7 +125,6 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(PauseTrigger.lockScreenOrIdle.pausesOnIdle)
         XCTAssertFalse(PauseTrigger.never.pausesOnLock)
         XCTAssertFalse(PauseTrigger.never.pausesOnIdle)
-        XCTAssertFalse(PauseTrigger.never.isEnabled)
         XCTAssertEqual(PauseTrigger.allCases.count, 4)
     }
 
@@ -141,6 +140,23 @@ final class SettingsTests: XCTestCase {
 
         reloaded.setSkippedUpdateVersion(nil)
         XCTAssertNil(Settings(defaults: defaults).skippedUpdateVersion)
+    }
+
+    @MainActor
+    func testLastUpdateCheckPersists() {
+        let settings = Settings(defaults: defaults)
+        XCTAssertNil(settings.lastUpdateCheck, "no check recorded on a fresh install")
+
+        let stamp = Date(timeIntervalSince1970: 1_700_000_000)
+        settings.markUpdateChecked(stamp)
+
+        let reloaded = Settings(defaults: defaults).lastUpdateCheck
+        XCTAssertNotNil(reloaded)
+        XCTAssertEqual(
+            reloaded?.timeIntervalSince1970 ?? 0,
+            stamp.timeIntervalSince1970,
+            accuracy: 0.001
+        )
     }
 
     @MainActor

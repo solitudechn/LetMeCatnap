@@ -31,6 +31,7 @@ public final class Settings: ObservableObject {
         public static let longBreakEvery = "longBreakEvery"
         public static let longBreakSeconds = "longBreakSeconds"
         public static let skippedUpdate = "skippedUpdate"
+        public static let lastUpdateCheck = "lastUpdateCheck"
         public static let hasCompletedWelcome = "hasCompletedWelcome"
     }
 
@@ -66,6 +67,9 @@ public final class Settings: ObservableObject {
     @Published public private(set) var hideMenuBarTimer: Bool
 
     @Published public private(set) var skippedUpdateVersion: String?
+    /// When the last successful update check happened. Persisted so a menu bar
+    /// app that is restarted often still checks once a day instead of never.
+    @Published public private(set) var lastUpdateCheck: Date?
     @Published public private(set) var hasCompletedWelcome: Bool
 
     // MARK: - Init
@@ -119,6 +123,9 @@ public final class Settings: ObservableObject {
         }
 
         skippedUpdateVersion = defaults.string(forKey: Key.skippedUpdate)
+        if let stamp = Self.optionalDouble(defaults, Key.lastUpdateCheck) {
+            lastUpdateCheck = Date(timeIntervalSince1970: stamp)
+        }
         hasCompletedWelcome = Self.boolean(
             defaults, Key.hasCompletedWelcome, fallback: Defaults.hasCompletedWelcome
         )
@@ -198,6 +205,11 @@ public final class Settings: ObservableObject {
         }
     }
 
+    public func markUpdateChecked(_ date: Date = Date()) {
+        lastUpdateCheck = date
+        defaults.set(date.timeIntervalSince1970, forKey: Key.lastUpdateCheck)
+    }
+
     public func markWelcomeCompleted() {
         guard !hasCompletedWelcome else { return }
         hasCompletedWelcome = true
@@ -225,5 +237,9 @@ public final class Settings: ObservableObject {
 
     private static func optionalInteger(_ defaults: UserDefaults, _ key: String) -> Int? {
         (defaults.object(forKey: key) as? NSNumber)?.intValue
+    }
+
+    private static func optionalDouble(_ defaults: UserDefaults, _ key: String) -> Double? {
+        (defaults.object(forKey: key) as? NSNumber)?.doubleValue
     }
 }

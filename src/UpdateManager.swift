@@ -132,23 +132,40 @@ class UpdateManager {
 
     // MARK: - Periodic Checks
 
-    /// Start the periodic update check timer.
-    /// The first check fires after `checkInterval` (24h), so we skip the first 24 hours.
+    /// Start the periodic update check.
+    ///
+    /// A menu bar app is usually restarted long before a 24-hour timer fires, so
+    /// "first check 24h after launch" meant most users were never checked at
+    /// all. Instead the last successful check is persisted and the timer catches
+    /// up shortly after launch when it is stale.
     func startPeriodicChecks() {
         stopPeriodicChecks()
-        updateCheckTimer = Timer.scheduledTimer(
-            withTimeInterval: Self.checkInterval,
-            repeats: true
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.performAutomaticCheck()
-            }
-        }
+        let interval = Self.checkInterval
+        let elapsed = Settings.shared.lastUpdateCheck
+            .map { Date().timeIntervalSince($0) } ?? interval
+        let delay = max(5, interval - elapsed)
+        scheduleCheck(after: delay, repeats: false)
     }
 
     func stopPeriodicChecks() {
         updateCheckTimer?.invalidate()
         updateCheckTimer = nil
+    }
+
+    private func scheduleCheck(after delay: TimeInterval, repeats: Bool) {
+        let timer = Timer(timeInterval: delay, repeats: repeats) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.performAutomaticCheck()
+                if !repeats {
+                    // After the catch-up check, settle into a daily cadence.
+                    self.stopPeriodicChecks()
+                    self.scheduleCheck(after: Self.checkInterval, repeats: true)
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        updateCheckTimer = timer
     }
 
     // MARK: - Automatic Check
@@ -180,6 +197,9 @@ class UpdateManager {
         Task {
             do {
                 let releases = try await fetchReleases()
+                // Only a completed round-trip counts: a failed check should be
+                // retried on the next launch instead of waiting a full day.
+                Settings.shared.markUpdateChecked()
                 let currentVersion = Self.currentAppVersion
 
                 // Find the latest non-prerelease release that has a valid version and iCHR.zip

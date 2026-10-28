@@ -24,7 +24,4 @@ public enum PauseTrigger: Int, CaseIterable, Sendable {
         self == .idle || self == .lockScreenOrIdle
     }
 
-    /// Title used in the menu. Localization lives in the app bundle, so the
-    /// enum deliberately carries no display string of its own.
-    public var isEnabled: Bool { self != .never }
 }

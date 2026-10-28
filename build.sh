@@ -82,6 +82,14 @@ fi
 can_sign=false
 can_notarize=false
 
+# The `dev-release` channel uploads through a helper that lives outside this
+# repository. Without it the build still produces a usable zip, so treat it as
+# optional instead of failing at the last step.
+can_upload=false
+if command -v share >/dev/null 2>&1; then
+    can_upload=true
+fi
+
 if [ -n "${ICHR_SIGNING_IDENTITY:-}" ] && [ "$mode" != "dev" ]; then
     can_sign=true
     if [ -n "${ICHR_NOTARY_PROFILE:-}" ]; then
@@ -363,7 +371,10 @@ do_upload() {
 case "$mode" in
     dev)         totalSteps=5 ;;
     dev-release)
-        totalSteps=9
+        totalSteps=8
+        if [ "$can_upload" = true ]; then
+            totalSteps=$((totalSteps + 1))
+        fi
         if [ "$can_notarize" = true ]; then
             totalSteps=$((totalSteps + 2))
         fi
@@ -440,7 +451,9 @@ if [ "$mode" != "dev" ]; then
         if [ "$can_sign" = true ]; then
             run_step "Verifying signatures..."     "failed to verify signatures"              do_verify
         fi
-        run_step "Uploading dev build..."          "failed to upload dev build"               do_upload "$loc/dist/$shortName-dev.zip"
+        if [ "$can_upload" = true ]; then
+            run_step "Uploading dev build..."      "failed to upload dev build"               do_upload "$loc/dist/$shortName-dev.zip"
+        fi
     fi
 fi
 
@@ -461,6 +474,9 @@ case "$mode" in
         echo -e "  ${dimColor}signing: $(if [ "$can_sign" = true ]; then echo "${greenColor}Developer ID${noColor}"; else echo "${redColor}ad-hoc${noColor}"; fi)"
         echo -e "  ${dimColor}notarized: $(if [ "$can_notarize" = true ]; then echo "${greenColor}yes${noColor}"; else echo "${redColor}no${noColor}"; fi)"
         echo -e "  ${dimColor}artifacts: dist/$name.app  dist/$shortName-dev.zip${noColor}"
+        if [ "$can_upload" = false ]; then
+            echo -e "  ${dimColor}upload skipped: 'share' not installed${noColor}"
+        fi
         ;;
     release)
         echo -e "  ${dimColor}mode: release${noColor}"

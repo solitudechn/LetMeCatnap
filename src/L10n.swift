@@ -156,7 +156,6 @@ extension L10n {
         return candidates.randomElement() ?? all.first ?? ""
     }
 
-    static var breakSoon: String { t("Break in 1 minute", "1 分钟后休息") }
     /// Advisory only — the break can still be skipped with Esc.
     static var skipHint: String {
         t("Skipped a few times — this one is worth taking",
@@ -198,7 +197,6 @@ extension L10n {
     static var pomodoroRhythm: String { t("Pomodoro Rhythm", "番茄节奏") }
     static var off: String            { t("Off", "关闭") }
     static var longBreakTitle: String { t("Time for a Longer Break", "该长休息了") }
-    static var longBreakStarted: String { t("Long break", "长休息") }
     static func longBreakPreset(every: Int, minutes: Int) -> String {
         t("Every \(every) sessions · \(minutes) min", "每 \(every) 轮 · \(minutes) 分钟")
     }
