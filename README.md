@@ -156,8 +156,6 @@ Every user-visible string is a case of `LocKey` in
 error, and `StringTableTests` fails if a translation is empty, lost its `%@`/`%ld`
 placeholder, or kept the English side untranslated.
 
-简体中文界面由 [solitudechn](https://github.com/solitudechn) 汉化并维护。
-
 One exception: Sparkle's own update dialogs follow the *system* language rather
 than the in-app **Language** switch — they come from inside the framework, not
 from `StringTable`.
