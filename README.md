@@ -8,7 +8,6 @@
   </a>
   <p><sub>Free and open source. Requires macOS 13+. English / Simplified Chinese.</sub></p>
 
-  [![CI](https://github.com/solitudechn/LetMeCatnap/actions/workflows/ci.yml/badge.svg)](https://github.com/solitudechn/LetMeCatnap/actions/workflows/ci.yml)
   [![Release](https://github.com/solitudechn/LetMeCatnap/actions/workflows/release.yml/badge.svg)](https://github.com/solitudechn/LetMeCatnap/actions/workflows/release.yml)
 
   <sub><a href="README.zh-CN.md">简体中文</a></sub>
@@ -153,7 +152,9 @@ python3 scripts/check-l10n.py         # every key translated, no stray literals
 swift format lint --recursive --strict src core Tests
 ```
 
-All of them run in CI on every push.
+The release workflow runs all of these before it builds an installer, so a
+failing test cannot ship. The CI workflow no longer runs on every push — trigger
+it from the Actions tab when you want a build without publishing.
 
 ## Troubleshooting
 

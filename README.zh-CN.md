@@ -8,7 +8,6 @@
   </a>
   <p><sub>免费开源，需要 macOS 13 或更高版本。中文 / English 双语界面。</sub></p>
 
-  [![CI](https://github.com/solitudechn/LetMeCatnap/actions/workflows/ci.yml/badge.svg)](https://github.com/solitudechn/LetMeCatnap/actions/workflows/ci.yml)
   [![Release](https://github.com/solitudechn/LetMeCatnap/actions/workflows/release.yml/badge.svg)](https://github.com/solitudechn/LetMeCatnap/actions/workflows/release.yml)
 
   <sub><a href="README.md">English</a></sub>
@@ -138,7 +137,8 @@ python3 scripts/check-l10n.py         # 每个键都有翻译，没有漏网的�
 swift format lint --recursive --strict src core Tests
 ```
 
-这些在每次 push 时都会由 CI 跑一遍。
+发版工作流在打包之前会把这几项全跑一遍，测试不过就不会生成安装包。CI 工作流
+不再随每次推送运行——想要一份不发布的构建，去 Actions 页面手动触发即可。
 
 ## 排错
 
