@@ -122,7 +122,11 @@ cd LetMeCatnap
 ./scripts/verify.sh                 # 格式检查 + 文案检查 + 单元测试 + shell 语法
 ```
 
-分开跑：
+分开跑（这几条用的是 `xcode-select` 当前指向的工具链，所以要么先
+`sudo xcode-select -s /Applications/Xcode.app`，要么加前缀
+`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`——Command Line Tools
+里既没有 XCTest 也没有 `swift format`，直接跑会报
+`unable to resolve module dependency: 'XCTest'`）：
 
 ```
 swift test --filter CatnapCoreTests   # 需要完整 Xcode（XCTest）

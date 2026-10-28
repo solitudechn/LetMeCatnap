@@ -137,7 +137,11 @@ Timing rules, the timer's state machine, settings and the string table live in t
 ./scripts/verify.sh                 # format lint + localization + unit tests + shell syntax
 ```
 
-Individually:
+Individually (these use whatever `xcode-select` points at, so select Xcode once
+with `sudo xcode-select -s /Applications/Xcode.app`, or prefix them with
+`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` — Command Line Tools
+ships neither XCTest nor `swift format`, and `swift test` fails with
+`unable to resolve module dependency: 'XCTest'`):
 
 ```
 swift test --filter CatnapCoreTests   # needs a full Xcode (XCTest)

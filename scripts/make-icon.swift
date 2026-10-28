@@ -4,15 +4,16 @@
 // `res/icon-source.jpg`.
 //
 // The artwork is a single drawing of a sleeping cat on a plain white
-// background. The white is keyed out, the cat's bounding box is measured and
-// then centred on a drawn tile, so the cat always sits at the same optical size
-// no matter how much empty canvas the drawing happens to have:
+// background. The cat's bounding box is measured, and the drawing is then
+// centred on a drawn tile, so the cat always sits at the same optical size no
+// matter how much empty canvas the drawing happens to have:
 //
 //   swift scripts/make-icon.swift
 //
-// The keying threshold matters: the eyes, the muzzle and the "zzz" are white
-// *inside* the silhouette. They come out transparent, which is correct — the
-// tile behind them shows through, exactly like a cut-out.
+// Nothing is keyed out: the white is used for measuring only, and the artwork
+// is composited with `.multiply`, so every white pixel — the background, and
+// the eyes, muzzle and "zzz" *inside* the silhouette — takes the tile's colour
+// and reads as a hole. That is why a JPEG's white background leaves no fringe.
 //
 // macOS only (AppKit + iconutil). Nothing here runs in CI.
 
@@ -54,13 +55,12 @@ func normalized(_ image: NSImage) -> NSBitmapImageRep {
 
 let raw = normalized(image)
 
-/// Copy of the artwork with the white background turned into transparency.
+/// The drawing's bounding box, found by treating anything darker than 90 %
+/// luminance as ink.
 ///
-/// Measurement only: the pixels are compared against white to find the
-/// drawing's bounding box. The background is *not* keyed out before drawing —
-/// the cat is composited with `.multiply` instead, which turns white into the
-/// tile colour for free and avoids the fringe a hand-rolled alpha ramp leaves on
-/// a JPEG.
+/// Measurement only: no pixel is altered here. The cat is composited with
+/// `.multiply` instead, which turns white into the tile colour for free and
+/// avoids the fringe a hand-rolled alpha ramp leaves on a JPEG.
 func measureDrawing(_ source: NSBitmapImageRep) -> CGRect {
     var minX = source.pixelsWide
     var maxX = 0
