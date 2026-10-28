@@ -188,3 +188,52 @@
 `codesign -r="designated => identifier ..."` 写入的显式 designated requirement。
 ad-hoc 包若不写这个 DR，DR 会退化成 cdhash，新旧版本必然不匹配、自动更新永远失败。
 这条命令因此不是可选项。
+
+---
+
+## 设计改造（第六轮）
+
+按「离开就锁屏」的使用习惯，把整套交互从"猜你是否离开"改为"等你明确的信号"。
+
+### 1. 锁屏检测取代空闲检测
+- 新监听 `com.apple.screenIsLocked` / `Unlocked`（DistributedNotificationCenter）与
+  `screensDidSleep/Wake`，启动时用 `CGSessionCopyCurrentDictionary` 兜底判断。
+- 删除 `CGEventSource` 空闲轮询：读文档两分钟不动鼠标不再等于"人走了"，
+  而锁屏/显示器休眠一定意味着离开。
+- 解锁后开始一个完整工作轮次（锁屏本身就是休息）。
+- 旧设置 `pauseWhenIdle` 只在首次升级时作为默认值读取一次（`Settings` 迁移），
+  之后统一用 `pauseWhenLocked`。
+
+### 2. 休息不再强制，Esc 永远可退出
+- 删除 `isBreakMandatory` 与 `skipBreak` 的拦截；`canSkipBreak` 只看
+  「是否在休息中 + 用户是否允许跳过」。
+- 连续跳过 2 次仍会提示（`showsSkipHint` + 一句建议文案），但**不阻止**跳过。
+- 长休息因此也不会再出现"锁屏 15 分钟无法退出"。
+
+### 3. 休息遮罩：先给信息，再让位给引导
+- 倒计时与进度环在 3 秒后淡出到 16% 透明度并缩小；引导语始终保留，
+  点一下圆环可再显示 3 秒（`TimerRules.countdownVisibleSeconds`）。
+- 全屏模式下显示一行极淡的「点一下圆环可查看剩余时间」。
+- 紧凑面板是点击穿透的，那里不倒计时淡出（否则无法唤回）。
+
+### 4. 菜单分层
+- 动作（暂停 / 立即休息 / 重新开始）→ 计时（工作、休息、番茄三个子菜单）→
+  提醒（六个开关）→ 开机启动、语言、关于、退出。
+- 布尔开关统一用 `BoolSetting` 枚举 + tag，取代原先散落的 `SettingsKey` 字符串。
+
+### 5. 首次启动引导
+- 不再需要额外窗口：首次启动自动展开一次菜单，顶部状态行显示一句欢迎语，
+  菜单关闭后写入 `hasCompletedWelcome`，此后不再出现。
+
+### 6. 代码分层与测试
+- 新增 `ICHRCore` 库（纯 Foundation，无 AppKit/SwiftUI）：
+  - `TimerRules`：时长换算、长休息判定、剩余时间、提醒阈值、跳过提示、时间格式化；
+  - `Settings`：所有偏好唯一来源，setter 内 clamp + 持久化 + `@Published`。
+- `TimerManager` 退化为协调者：状态机 + 定时器 + 系统通知 + 遮罩调度。
+- `Tests/ICHRCoreTests`：34 项规则与设置测试；`scripts/check-l10n.py`：文案完整性审计。
+  两者都接进 CI（`swift test` 需完整 Xcode，本地仅有 CLT 时跳过）。
+
+### 已知限制
+- `swift test` 依赖 XCTest，只能在完整 Xcode 下运行；本地用 `swiftc -typecheck`
+  与等价的行为脚本验证（33 项状态测试 + 34 项 Core 断言）。
+- 公证顺序问题（见上一节）仍未处理，需在启用签名时一并调整。

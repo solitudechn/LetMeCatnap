@@ -76,12 +76,19 @@ extension L10n {
     static var workInterval: String        { t("Work Interval", "工作时长") }
     static var breakDuration: String       { t("Break Duration", "休息时长") }
     static var pauseDuringMeetings: String { t("Pause During Meetings", "会议中自动暂停") }
-    static var pauseWhenIdle: String       { t("Pause When Idle", "空闲时自动暂停") }
+    static var pauseWhenLocked: String    { t("Pause When Screen Locks", "锁屏时自动暂停") }
     static var allowSkipBreak: String      { t("Allow Skip Break", "允许跳过休息") }
     static var muteSounds: String          { t("Mute Sounds", "静音") }
     static var hideMenuBarTimer: String    { t("Hide Timer in Menu Bar", "隐藏菜单栏倒计时") }
     static var launchAtLogin: String       { t("Launch at Login", "开机启动") }
     static var languageLabel: String     { t("Language", "语言") }
+    static var timerSettings: String      { t("Timer", "计时") }
+    static var reminderSettings: String   { t("Reminders", "提醒") }
+    /// Shown once, in the menu, on the very first launch.
+    static var welcome: String {
+        t("Running in your menu bar — pick an action below",
+          "已驻留在菜单栏，点下面的操作即可开始")
+    }
 
     static func minutes(_ n: Int) -> String { t("\(n) min", "\(n) 分钟") }
     static func seconds(_ n: Int) -> String { t("\(n) sec", "\(n) 秒") }
@@ -96,7 +103,7 @@ extension L10n {
     static func pausedCountdown(_ time: String) -> String { t("Paused \(time)", "已暂停 \(time)") }
     static var meetingInProgress: String { t("Meeting", "会议中") }
     static var inMeeting: String         { t("In meeting", "会议中") }
-    static var idle: String               { t("Idle", "空闲") }
+    static var locked: String            { t("Locked", "锁屏") }
     static var onBreak: String            { t("On a break", "休息中") }
     static func nextBreakIn(_ time: String) -> String {
         t("Next break in \(time)", "下次休息 \(time)")
@@ -108,7 +115,7 @@ extension L10n {
     static var pausedInMeeting: String { t("Paused — Meeting", "已暂停 — 会议中") }
     static func breakPending(_ source: String) -> String { t("\(source) — Break pending", "\(source) — 待休息") }
     static var inMeetingBreakPending: String { t("In meeting — Break pending", "会议中 — 待休息") }
-    static var pausedIdle: String { t("Paused — Idle", "已暂停 — 空闲") }
+    static var pausedLocked: String { t("Paused — Screen locked", "已暂停 — 锁屏") }
     static var paused: String     { t("Paused", "已暂停") }
 
     // ── Meeting detection (MeetingDetector.meetingSource) ───────
@@ -128,6 +135,7 @@ extension L10n {
     static var skip: String { t("Skip", "跳过") }
     /// Keyboard hint — key names are not translated.
     static var skipKeys: String { "Esc / ⌃Esc" }
+    static var showRemaining: String { t("Tap the ring to see the time left", "点一下圆环可查看剩余时间") }
 
     // ── Break guidance ──────────────────────────────────────────
 
@@ -142,8 +150,10 @@ extension L10n {
     }
 
     static var breakSoon: String { t("Break in 1 minute", "1 分钟后休息") }
-    static var breakMandatory: String {
-        t("You skipped twice — this one counts", "连跳两次了，这次认真休息一下")
+    /// Advisory only — the break can still be skipped with Esc.
+    static var skipHint: String {
+        t("Skipped a few times — this one is worth taking",
+          "连跳几次了，这次休息一下会更好")
     }
 
     private static var enBreakTips: [String] {

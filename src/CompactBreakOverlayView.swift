@@ -6,6 +6,8 @@ struct CompactBreakOverlayView: View {
     @State private var breathe = false
     @State private var appeared = false
     @State private var ringProgress: CGFloat = 0
+    // The panel is click-through, so unlike the full overlay the countdown is
+    // never hidden — there would be no way to bring it back.
 
     private var reduceMotion: Bool {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -86,8 +88,9 @@ struct CompactBreakOverlayView: View {
                     .background(.white.opacity(0.08), in: Capsule())
                     .overlay(Capsule().stroke(.white.opacity(0.1), lineWidth: 0.5))
                     .opacity(appeared ? 1 : 0)
-                } else if timerManager.isBreakMandatory {
-                    Text(L10n.breakMandatory)
+                } else if timerManager.showsSkipHint {
+                    // Escape still works; this is only a nudge.
+                    Text(L10n.skipHint)
                         .font(.system(size: 11, weight: .regular))
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.white.opacity(0.3))

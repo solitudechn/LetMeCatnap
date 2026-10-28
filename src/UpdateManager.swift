@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Security
+import ICHRCore
 
 // MARK: - Semantic Version
 
@@ -107,6 +108,7 @@ enum UpdateError: LocalizedError {
 
 // MARK: - Update Manager
 
+@MainActor
 class UpdateManager {
     static let shared = UpdateManager()
 
@@ -138,7 +140,9 @@ class UpdateManager {
             withTimeInterval: Self.checkInterval,
             repeats: true
         ) { [weak self] _ in
-            self?.performAutomaticCheck()
+            Task { @MainActor in
+                self?.performAutomaticCheck()
+            }
         }
     }
 
@@ -325,8 +329,8 @@ class UpdateManager {
     }
 
     var skippedVersion: String? {
-        get { UserDefaults.standard.string(forKey: SettingsKey.skippedUpdate) }
-        set { UserDefaults.standard.set(newValue, forKey: SettingsKey.skippedUpdate) }
+        get { Settings.shared.skippedUpdateVersion }
+        set { Settings.shared.setSkippedUpdateVersion(newValue) }
     }
 
     private func listZipEntries(at url: URL) async throws -> [String] {

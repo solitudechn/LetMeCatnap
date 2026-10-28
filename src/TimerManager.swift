@@ -2,7 +2,7 @@ import Foundation
 import Combine
 import AppKit
 import CoreGraphics
-import IOKit.pwr_mgt
+import ICHRCore
 
 enum TimerState {
     case working
@@ -13,25 +13,8 @@ enum TimerState {
 enum PauseReason {
     case manual
     case meeting
-    case idle
+    case locked
     case breakPending  // Work timer expired during meeting, waiting for meeting to end
-}
-
-enum SettingsKey {
-    static let workDurationMinutes = "workDurationMinutes"
-    static let breakDurationSeconds = "breakDurationSeconds"
-    static let pauseDuringMeetings = "pauseDuringMeetings"
-    static let allowSkipBreak = "allowSkipBreak"
-    static let muteSounds = "muteSounds"
-    static let pauseWhenIdle = "pauseWhenIdle"
-    static let skippedUpdate = "skippedUpdate"
-    static let hideMenuBarTimer = "hideMenuBarTimer"
-    /// 0 disables the pomodoro rhythm; otherwise every N finished work sessions
-    /// ends in a long break instead of a short one.
-    static let longBreakEvery = "longBreakEvery"
-    static let longBreakSeconds = "longBreakSeconds"
-    /// Warn before the break, and stop the user from skipping forever.
-    static let progressiveReminders = "progressiveReminders"
 }
 
 @MainActor
@@ -53,8 +36,8 @@ class TimerManager: ObservableObject {
     private var isEndingBreak = false
     private var graceAnimTask: Task<Void, Never>?
     private var wasInMeeting: Bool = false
-    private var wasIdle: Bool = false
 
+    let settings: Settings
     let meetingDetector = MeetingDetector()
     let overlayManager = OverlayManager()
     private let postMeetingBreakDelay = 5
@@ -69,51 +52,24 @@ class TimerManager: ObservableObject {
     @Published private(set) var isLongBreak: Bool = false
     /// True during the last minute of a work session (progressive reminders).
     @Published private(set) var isBreakImminent: Bool = false
-    /// Consecutive breaks the user skipped without taking them.
+    /// Consecutive breaks the user skipped without taking them. Only used for a
+    /// gentle nudge — skipping is always allowed.
     @Published private(set) var skipStreak: Int = 0
 
     /// Finished work sessions since launch, used to place long breaks.
     private var workSessionsCompleted: Int = 0
-    /// After this many consecutive skips the next break is not skippable.
-    private let mandatorySkipStreak = 2
-    private let impendingBreakSeconds = 60
 
     // Activity to prevent App Nap
     private var activity: NSObjectProtocol?
 
-    var workDurationSeconds: Int {
-        UserDefaults.standard.integer(forKey: SettingsKey.workDurationMinutes).clamped(to: 1...120) * 60
-    }
-
-    var breakDurationSeconds: Int {
-        let val = UserDefaults.standard.integer(forKey: SettingsKey.breakDurationSeconds)
-        // FIXME: clamp to 9:59 due to UI issues
-        return val.clamped(to: 5...599)
-    }
-
-    var pauseDuringMeetings: Bool {
-        UserDefaults.standard.bool(forKey: SettingsKey.pauseDuringMeetings)
-    }
-
-    var muteSounds: Bool {
-        UserDefaults.standard.bool(forKey: SettingsKey.muteSounds)
-    }
-
-    var pauseWhenIdle: Bool {
-        UserDefaults.standard.bool(forKey: SettingsKey.pauseWhenIdle)
-    }
-
-    // MARK: - Pomodoro rhythm / progressive reminders
-
-    /// 0 = rhythm disabled. Clamped so a hand-edited plist cannot break the timer.
-    var longBreakEvery: Int {
-        UserDefaults.standard.integer(forKey: SettingsKey.longBreakEvery).clamped(to: 0...12)
-    }
-
-    /// A long break may well exceed the short-break UI cap (9:59).
-    var longBreakSeconds: Int {
-        UserDefaults.standard.integer(forKey: SettingsKey.longBreakSeconds).clamped(to: 60...3600)
-    }
+    var workDurationSeconds: Int { settings.workSeconds }
+    var breakDurationSeconds: Int { settings.shortBreakSeconds }
+    var pauseDuringMeetings: Bool { settings.pauseDuringMeetings }
+    var muteSounds: Bool { settings.muteSounds }
+    var pauseWhenLocked: Bool { settings.pauseWhenLocked }
+    var longBreakEvery: Int { settings.longBreakEvery }
+    var longBreakSeconds: Int { settings.longBreakTotalSeconds }
+    var progressiveReminders: Bool { settings.progressiveReminders }
 
     /// Duration of the break in progress — the ring needs the real total,
     /// otherwise a 15-minute break would fill up in 20 seconds.
@@ -124,21 +80,16 @@ class TimerManager: ObservableObject {
         return isLongBreak ? longBreakSeconds : breakDurationSeconds
     }
 
-    var progressiveReminders: Bool {
-        UserDefaults.standard.bool(forKey: SettingsKey.progressiveReminders)
-    }
-
-    /// Progressive reminders: after enough consecutive skips, the break is not
-    /// skippable any more.
-    var isBreakMandatory: Bool {
-        progressiveReminders && state == .onBreak && skipStreak >= mandatorySkipStreak
-    }
-
-    /// The single source of truth for both the overlay button and Esc hotkey.
+    /// Skipping is always allowed while a break is on screen: a reminder must
+    /// never be stronger than the work it interrupts.
     var canSkipBreak: Bool {
-        state == .onBreak
-            && UserDefaults.standard.bool(forKey: SettingsKey.allowSkipBreak)
-            && !isBreakMandatory
+        state == .onBreak && settings.allowSkipBreak
+    }
+
+    /// After repeated skips the overlay shows a nudge instead of silently
+    /// letting the break go — purely advisory, never blocking.
+    var showsSkipHint: Bool {
+        progressiveReminders && state == .onBreak && skipStreak >= TimerRules.skipHintThreshold
     }
 
     var menuBarText: String {
@@ -153,8 +104,8 @@ class TimerManager: ObservableObject {
                 return L10n.meetingCountdown(formatTime(secondsBeforePause))
             case .breakPending:
                 return L10n.meetingInProgress
-            case .idle:
-                return L10n.idle
+            case .locked:
+                return L10n.locked
             case .manual:
                 return L10n.pausedCountdown(formatTime(secondsBeforePause))
             }
@@ -168,8 +119,8 @@ class TimerManager: ObservableObject {
             return meetingDetector.meetingSource.map { L10n.pausedWith($0) } ?? L10n.pausedInMeeting
         case .breakPending:
             return meetingDetector.meetingSource.map { L10n.breakPending($0) } ?? L10n.inMeetingBreakPending
-        case .idle:
-            return L10n.pausedIdle
+        case .locked:
+            return L10n.pausedLocked
         case .manual:
             return L10n.paused
         }
@@ -183,25 +134,20 @@ class TimerManager: ObservableObject {
         meetingDetector.isInMeeting
     }
 
-    init() {
-        // Register defaults
-        UserDefaults.standard.register(defaults: [
-            SettingsKey.workDurationMinutes: 20,
-            SettingsKey.breakDurationSeconds: 20,
-            SettingsKey.pauseDuringMeetings: true,
-            SettingsKey.allowSkipBreak: true,
-            SettingsKey.muteSounds: false,
-            SettingsKey.pauseWhenIdle: true,
-            SettingsKey.hideMenuBarTimer: false,
-            SettingsKey.longBreakEvery: 4,
-            SettingsKey.longBreakSeconds: 900,
-            SettingsKey.progressiveReminders: true,
-        ])
-        // Start timer and ticker (ticker runs for app lifetime)
+    init(settings: Settings) {
+        self.settings = settings
+
         remainingSeconds = workDurationSeconds
-        workDeadline = Date().addingTimeInterval(TimeInterval(remainingSeconds))
+        workDeadline = TimerRules.deadline(from: Date(), seconds: remainingSeconds)
         state = .working
         startTicking()
+        observeScreenLock()
+
+        // A Lock Screen or display sleep while the app was still launching
+        // should not leave the timer running behind it.
+        if settings.pauseWhenLocked && isScreenLocked() {
+            handleScreenLocked()
+        }
 
         // Reset work timer on wake — sleep time isn't work time
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -213,6 +159,70 @@ class TimerManager: ObservableObject {
                 self?.handleWake()
             }
         }
+    }
+
+    // MARK: - Screen lock (the only "user is away" signal we trust)
+
+    /// Locking is deliberate; idle time is not. Reading a long document leaves
+    /// the keyboard untouched for minutes, and pausing on that would suppress
+    /// the break exactly when it is most useful.
+    private func observeScreenLock() {
+        let distributed = DistributedNotificationCenter.default()
+        distributed.addObserver(
+            forName: .init("com.apple.screenIsLocked"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.handleScreenLocked() }
+        }
+        distributed.addObserver(
+            forName: .init("com.apple.screenIsUnlocked"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.handleScreenUnlocked() }
+        }
+
+        // Display sleep usually comes with the lock, and also means nobody is
+        // looking at the screen any more.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.screensDidSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.handleScreenLocked() }
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.screensDidWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.handleScreenUnlocked() }
+        }
+    }
+
+    private func isScreenLocked() -> Bool {
+        guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else {
+            return false
+        }
+        return (session["CGSSessionScreenIsLocked"] as? Bool) ?? false
+    }
+
+    private func handleScreenLocked() {
+        guard settings.pauseWhenLocked, state == .working else { return }
+        updateWorkingCountdown()
+        secondsBeforePause = remainingSeconds
+        workDeadline = nil
+        isBreakImminent = false
+        state = .paused
+        pauseReason = .locked
+        Log.info("Timer paused: screen locked (\(secondsBeforePause)s banked)")
+    }
+
+    private func handleScreenUnlocked() {
+        guard state == .paused, pauseReason == .locked else { return }
+        Log.info("Screen unlocked — starting a full work session")
+        beginWorking(seconds: workDurationSeconds)
     }
 
     private func handleWake() {
@@ -268,7 +278,7 @@ class TimerManager: ObservableObject {
     func skipBreak() {
         guard state == .onBreak else { return }
         guard canSkipBreak else {
-            Log.info("Break skip blocked (allowed=\(UserDefaults.standard.bool(forKey: SettingsKey.allowSkipBreak)), mandatory=\(isBreakMandatory))")
+            Log.info("Break skip rejected: skipping is disabled in settings")
             return
         }
         Log.info("Break overlay closed: user cancelled")
@@ -284,7 +294,7 @@ class TimerManager: ObservableObject {
         }
         // Keep the remaining time, but move its deadline to match a setting
         // change made between timer ticks.
-        workDeadline = Date().addingTimeInterval(TimeInterval(remainingSeconds))
+        workDeadline = TimerRules.deadline(from: Date(), seconds: remainingSeconds)
         updateImminentFlag()
     }
 
@@ -312,12 +322,11 @@ class TimerManager: ObservableObject {
         }
     }
 
-    // Called when the user toggles "Pause When Idle".
-    func pauseWhenIdleSettingChanged(enabled: Bool) {
-        guard !enabled, state == .paused, pauseReason == .idle else { return }
-        Log.info("Pause When Idle disabled while idle — resuming")
-        wasIdle = false
-        resumeFromIdle()
+    // Called when the user toggles "Pause When Screen Locks".
+    func pauseWhenLockedSettingChanged(enabled: Bool) {
+        guard !enabled, state == .paused, pauseReason == .locked else { return }
+        Log.info("Lock pause disabled while locked — resuming")
+        beginWorking(seconds: workDurationSeconds)
     }
 
     // MARK: - Private
@@ -338,7 +347,7 @@ class TimerManager: ObservableObject {
         breakDeadline = nil
         nextBreakTipDate = nil
         remainingSeconds = duration
-        workDeadline = Date().addingTimeInterval(TimeInterval(duration))
+        workDeadline = TimerRules.deadline(from: Date(), seconds: duration)
         if resetImminent {
             isBreakImminent = false
         }
@@ -347,10 +356,10 @@ class TimerManager: ObservableObject {
 
     private func updateWorkingCountdown(now: Date = Date()) {
         if workDeadline == nil {
-            workDeadline = now.addingTimeInterval(TimeInterval(remainingSeconds))
+            workDeadline = TimerRules.deadline(from: now, seconds: remainingSeconds)
         }
         guard let workDeadline else { return }
-        remainingSeconds = max(0, Int(ceil(workDeadline.timeIntervalSince(now))))
+        remainingSeconds = TimerRules.remainingSeconds(deadline: workDeadline, now: now)
     }
 
     private func startTicking() {
@@ -369,10 +378,9 @@ class TimerManager: ObservableObject {
     private func tick() {
         tickCount += 1
 
-        // Check for meetings and idle every 5 seconds
+        // Check for meetings every 5 seconds
         if tickCount % 5 == 0 {
             if pauseDuringMeetings { checkMeetingStatus() }
-            if pauseWhenIdle { checkIdleStatus() }
         }
 
         switch state {
@@ -398,10 +406,10 @@ class TimerManager: ObservableObject {
                 }
                 graceProgress = 1
                 if breakDeadline == nil {
-                    breakDeadline = now.addingTimeInterval(TimeInterval(remainingSeconds))
+                    breakDeadline = TimerRules.deadline(from: now, seconds: remainingSeconds)
                 }
                 if let breakDeadline {
-                    remainingSeconds = max(0, Int(ceil(breakDeadline.timeIntervalSince(now))))
+                    remainingSeconds = TimerRules.remainingSeconds(deadline: breakDeadline, now: now)
                 }
                 // Rotate by wall-clock time rather than an exact countdown
                 // value, which a delayed tick could otherwise skip.
@@ -419,10 +427,11 @@ class TimerManager: ObservableObject {
     /// Progressive reminders: during the last minute, flag the menu-bar
     /// hourglass and play the soft chime once on entry (including after resume).
     private func updateImminentFlag() {
-        let imminent = progressiveReminders
-            && state == .working
-            && remainingSeconds > 0
-            && remainingSeconds <= impendingBreakSeconds
+        let imminent = TimerRules.isImminent(
+            remaining: remainingSeconds,
+            enabled: progressiveReminders,
+            isWorking: state == .working
+        )
         if imminent && !isBreakImminent {
             Log.info("Break impending: \(remainingSeconds)s left")
             if !muteSounds { NSSound(named: "Tink")?.play() }
@@ -479,24 +488,31 @@ class TimerManager: ObservableObject {
             // Count only naturally completed work, not the manual "break now".
             workSessionsCompleted += 1
         }
-        // Deliberately does NOT reset `skipStreak` here. Clearing it when a
-        // voluntary break *starts* let the user dodge a mandatory break with
-        // "Take a Break Now" + Skip. The streak is cleared in `endBreak()`
-        // instead, i.e. only once a break is actually taken.
-        let every = longBreakEvery
-        isLongBreak = countWorkSession && every > 0 && workSessionsCompleted % every == 0
-        activeBreakTotalSeconds = isLongBreak ? longBreakSeconds : breakDurationSeconds
+        // Deliberately does NOT reset `skipStreak` here: clearing it when a
+        // voluntary break starts would let the nudge be dodged and would also
+        // lose the information that the user keeps skipping. It is cleared in
+        // `endBreak()` only, i.e. once a break is actually taken.
+        isLongBreak = countWorkSession && TimerRules.isLongBreak(
+            sessionsCompleted: workSessionsCompleted,
+            every: longBreakEvery
+        )
+        activeBreakTotalSeconds = TimerRules.breakTotalSeconds(
+            isLong: isLongBreak,
+            shortSeconds: settings.breakSeconds,
+            longSeconds: settings.longBreakSeconds
+        )
 
+        let now = Date()
         remainingSeconds = activeBreakTotalSeconds
         state = .onBreak
         isEndingBreak = false
         isBreakImminent = false
         workDeadline = nil
-        breakStartTime = Date()
-        breakDeadline = breakStartTime
+        breakStartTime = now
+        breakDeadline = now
             .addingTimeInterval(breakGracePeriod)
             .addingTimeInterval(TimeInterval(activeBreakTotalSeconds))
-        nextBreakTipDate = breakStartTime.addingTimeInterval(breakGracePeriod + 20)
+        nextBreakTipDate = now.addingTimeInterval(breakGracePeriod + 20)
         isInGracePeriod = true
         graceProgress = 0
         breakTip = L10n.randomBreakTip(excluding: breakTip)
@@ -563,9 +579,9 @@ class TimerManager: ObservableObject {
                 wasInMeeting = true
             }
             // Timer keeps running during meetings when working — no pause.
-            // A meeting may interrupt a normal break, but must not bypass a
-            // mandatory break or count as a user-initiated skip.
-            if state == .onBreak && !isBreakMandatory {
+            // A meeting interrupts a break; the user can skip one themselves,
+            // so this is only about getting out of the way.
+            if state == .onBreak {
                 Log.info("Break interrupted by meeting")
                 overlayManager.dismissOverlay()
                 beginWorking(seconds: workDurationSeconds)
@@ -583,89 +599,13 @@ class TimerManager: ObservableObject {
                 // Meeting ended with break pending — short countdown then break
                 beginWorking(seconds: postMeetingBreakDelay)
             } else if state == .paused && pauseReason == .meeting {
-                // Meeting ended (break was skipped), resume
+                // Meeting ended (break was interrupted), resume
                 resume()
             }
         }
     }
-
-    // MARK: - Idle Detection
-
-    #if DEBUG
-    private let idleThreshold: TimeInterval = 30 // 30 seconds for testing
-    #else
-    private var idleThreshold: TimeInterval { 60 + TimeInterval(breakDurationSeconds) }
-    #endif
-
-    private func checkIdleStatus() {
-        // kCGAnyInputEventType (~0) checks all input event types
-        let idleTime = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
-
-        if idleTime >= idleThreshold && !hasActiveDisplaySleepAssertion() {
-            if state == .working {
-                if !wasIdle {
-                    Log.info("Idle mode entered (idle for \(Int(idleTime))s)")
-                    wasIdle = true
-                }
-                secondsBeforePause = remainingSeconds
-                state = .paused
-                pauseReason = .idle
-            }
-        } else {
-            if wasIdle {
-                Log.info("Idle mode left")
-                wasIdle = false
-            }
-            if state == .paused && pauseReason == .idle {
-                resumeFromIdle()
-            }
-        }
-    }
-
-    private func resumeFromIdle() {
-        guard state == .paused && pauseReason == .idle else { return }
-
-        // Check for active meeting before resuming to avoid a gap
-        if pauseDuringMeetings {
-            meetingDetector.check()
-            if meetingDetector.isInMeeting {
-                secondsBeforePause = workDurationSeconds
-                pauseReason = .meeting
-                return
-            }
-        }
-
-        beginWorking(seconds: workDurationSeconds)
-    }
-
-    private func hasActiveDisplaySleepAssertion() -> Bool {
-        var assertions: Unmanaged<CFDictionary>?
-        guard IOPMCopyAssertionsByProcess(&assertions) == kIOReturnSuccess,
-              let dict = assertions?.takeRetainedValue() as? [String: [[String: Any]]] else {
-            return false
-        }
-
-        for (_, processAssertions) in dict {
-            for assertion in processAssertions {
-                if let type = assertion["AssertType"] as? String,
-                   type == "PreventUserIdleDisplaySleep" || type == "NoDisplaySleep" {
-                    return true
-                }
-            }
-        }
-        return false
-    }
-
 }
 
 func formatTime(_ seconds: Int) -> String {
-    let m = seconds / 60
-    let s = seconds % 60
-    return String(format: "%d:%02d", m, s)
-}
-
-extension Int {
-    func clamped(to range: ClosedRange<Int>) -> Int {
-        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
-    }
+    TimerRules.formatTime(seconds)
 }

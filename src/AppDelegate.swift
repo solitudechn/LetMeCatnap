@@ -1,6 +1,7 @@
 import AppKit
 import ServiceManagement
 import SwiftUI
+import ICHRCore
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
@@ -9,6 +10,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     private var statusBarTimer: Timer?
     private var menuIsOpen = false
     private var aboutWindow: NSWindow?
+    private let settings = Settings.shared
+    /// First-run guidance is shown inside the menu itself, so the app never
+    /// throws a window at someone who just installed it.
+    private var showsWelcome = false
+
+    /// Boolean preferences, encoded as menu tags so one action can toggle them.
+    private enum BoolSetting: Int, CaseIterable {
+        case pauseDuringMeetings
+        case pauseWhenLocked
+        case allowSkipBreak
+        case progressiveReminders
+        case muteSounds
+        case hideMenuBarTimer
+
+        var title: String {
+            switch self {
+            case .pauseDuringMeetings: return L10n.pauseDuringMeetings
+            case .pauseWhenLocked: return L10n.pauseWhenLocked
+            case .allowSkipBreak: return L10n.allowSkipBreak
+            case .progressiveReminders: return L10n.progressiveReminders
+            case .muteSounds: return L10n.muteSounds
+            case .hideMenuBarTimer: return L10n.hideMenuBarTimer
+            }
+        }
+    }
 
     // Menu items that need updating
     private var statusMenuItem: NSMenuItem!
@@ -18,12 +44,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     private var workIntervalMenu: NSMenu!
     private var breakDurationMenu: NSMenu!
     private var pomodoroMenu: NSMenu!
-    private var pauseDuringMeetingsMenuItem: NSMenuItem!
-    private var allowSkipMenuItem: NSMenuItem!
-    private var progressiveMenuItem: NSMenuItem!
-    private var pauseWhenIdleMenuItem: NSMenuItem!
-    private var muteSoundsMenuItem: NSMenuItem!
-    private var hideMenuBarTimerMenuItem: NSMenuItem!
+    private var boolSettingItems: [NSMenuItem] = []
     private var launchAtLoginMenuItem: NSMenuItem!
     private var languageMenu: NSMenu!
 
@@ -47,22 +68,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     ]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        timerManager = TimerManager()
+        timerManager = TimerManager(settings: settings)
 
         Log.info("App started")
         Log.info("Log file: \(Log.fileURL.path)")
-        let ud = UserDefaults.standard
-        Log.info("Config: work=\(timerManager.workDurationSeconds / 60)min, break=\(timerManager.breakDurationSeconds)s, pauseDuringMeetings=\(timerManager.pauseDuringMeetings), allowSkipBreak=\(ud.bool(forKey: SettingsKey.allowSkipBreak)), muteSounds=\(timerManager.muteSounds), pauseWhenIdle=\(timerManager.pauseWhenIdle), launchAtLogin=\(SMAppService.mainApp.status == .enabled)")
-        Log.info("Rhythm: longBreakEvery=\(timerManager.longBreakEvery), longBreak=\(timerManager.longBreakSeconds)s, progressiveReminders=\(timerManager.progressiveReminders)")
+        Log.info("Config: work=\(settings.workMinutes)min, break=\(settings.breakSeconds)s, pauseDuringMeetings=\(settings.pauseDuringMeetings), pauseWhenLocked=\(settings.pauseWhenLocked), allowSkipBreak=\(settings.allowSkipBreak), muteSounds=\(settings.muteSounds), launchAtLogin=\(SMAppService.mainApp.status == .enabled)")
+        Log.info("Rhythm: longBreakEvery=\(settings.longBreakEvery), longBreak=\(settings.longBreakSeconds)s, progressiveReminders=\(settings.progressiveReminders)")
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(systemSymbolName: "timer", accessibilityDescription: AppConstants.appName)
         statusItem.button?.imagePosition = .imageLeading
         statusItem.button?.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
 
+        showsWelcome = !settings.hasCompletedWelcome
         buildMenu()
         startStatusBarTimer()
         setupUpdateSystem()
+
+        // On the very first launch, open the menu once so the window-less app
+        // announces itself. Everything else stays where every other menu bar
+        // app puts it — no extra windows, no dialogs.
+        if showsWelcome {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                self?.statusItem.button?.performClick(nil)
+            }
+        }
     }
 
     // MARK: - Menu Construction
@@ -78,7 +108,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
 
         menu.addItem(.separator())
 
-        // Pause / Resume
+        // ── Actions: the only items pressed daily ──
         pauseResumeMenuItem = NSMenuItem(
             title: timerManager.state == .paused ? L10n.resumeTimer : L10n.pauseTimer,
             action: #selector(togglePause), keyEquivalent: "p"
@@ -86,91 +116,58 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         pauseResumeMenuItem.target = self
         menu.addItem(pauseResumeMenuItem)
 
-        takeBreakNowMenuItem = NSMenuItem(title: L10n.takeBreakNow, action: #selector(takeBreakNow), keyEquivalent: "b")
+        takeBreakNowMenuItem = NSMenuItem(
+            title: L10n.takeBreakNow,
+            action: #selector(takeBreakNow),
+            keyEquivalent: "b"
+        )
         takeBreakNowMenuItem.target = self
         menu.addItem(takeBreakNowMenuItem)
 
-        restartMenuItem = NSMenuItem(title: L10n.restartTimer, action: #selector(restartTimer), keyEquivalent: "r")
+        restartMenuItem = NSMenuItem(
+            title: L10n.restartTimer,
+            action: #selector(restartTimer),
+            keyEquivalent: "r"
+        )
         restartMenuItem.target = self
         menu.addItem(restartMenuItem)
 
         menu.addItem(.separator())
 
-        // Work Interval submenu
-        let workItem = NSMenuItem(title: L10n.workInterval, action: nil, keyEquivalent: "")
-        workIntervalMenu = NSMenu()
-        for minutes in workIntervalOptions {
-            let item = NSMenuItem(title: L10n.minutes(minutes), action: #selector(setWorkInterval(_:)), keyEquivalent: "")
-            item.target = self
-            item.tag = minutes
-            workIntervalMenu.addItem(item)
-        }
-        workItem.submenu = workIntervalMenu
-        menu.addItem(workItem)
+        // ── Timer settings ──
+        let timerItem = NSMenuItem(title: L10n.timerSettings, action: nil, keyEquivalent: "")
+        let timerMenu = NSMenu()
+        timerMenu.addItem(makeWorkIntervalItem())
+        timerMenu.addItem(makeBreakDurationItem())
+        timerMenu.addItem(makePomodoroItem())
+        timerItem.submenu = timerMenu
+        menu.addItem(timerItem)
 
-        // Break Duration submenu
-        let breakItem = NSMenuItem(title: L10n.breakDuration, action: nil, keyEquivalent: "")
-        breakDurationMenu = NSMenu()
-        for seconds in breakDurationOptions {
-            let item = NSMenuItem(title: formatBreakDuration(seconds), action: #selector(setBreakDuration(_:)), keyEquivalent: "")
+        // ── Reminder settings ──
+        let reminderItem = NSMenuItem(title: L10n.reminderSettings, action: nil, keyEquivalent: "")
+        let reminderMenu = NSMenu()
+        boolSettingItems = []
+        for setting in BoolSetting.allCases {
+            let item = NSMenuItem(
+                title: setting.title,
+                action: #selector(toggleBoolSetting(_:)),
+                keyEquivalent: ""
+            )
             item.target = self
-            item.tag = seconds
-            breakDurationMenu.addItem(item)
+            item.tag = setting.rawValue
+            boolSettingItems.append(item)
+            reminderMenu.addItem(item)
         }
-        breakItem.submenu = breakDurationMenu
-        menu.addItem(breakItem)
-
-        // Pomodoro rhythm submenu — every N work sessions ends in a long break
-        let pomodoroItem = NSMenuItem(title: L10n.pomodoroRhythm, action: nil, keyEquivalent: "")
-        pomodoroMenu = NSMenu()
-        for preset in pomodoroPresets {
-            let title = preset.every == 0
-                ? L10n.off
-                : L10n.longBreakPreset(every: preset.every, minutes: preset.seconds / 60)
-            let item = NSMenuItem(title: title, action: #selector(setPomodoroPreset(_:)), keyEquivalent: "")
-            item.target = self
-            item.tag = preset.every * 10000 + preset.seconds
-            pomodoroMenu.addItem(item)
-        }
-        pomodoroItem.submenu = pomodoroMenu
-        menu.addItem(pomodoroItem)
+        reminderItem.submenu = reminderMenu
+        menu.addItem(reminderItem)
 
         menu.addItem(.separator())
 
-        // Toggles
-        pauseDuringMeetingsMenuItem = NSMenuItem(title: L10n.pauseDuringMeetings, action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
-        pauseDuringMeetingsMenuItem.target = self
-        pauseDuringMeetingsMenuItem.representedObject = SettingsKey.pauseDuringMeetings
-        menu.addItem(pauseDuringMeetingsMenuItem)
-
-        pauseWhenIdleMenuItem = NSMenuItem(title: L10n.pauseWhenIdle, action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
-        pauseWhenIdleMenuItem.target = self
-        pauseWhenIdleMenuItem.representedObject = SettingsKey.pauseWhenIdle
-        menu.addItem(pauseWhenIdleMenuItem)
-
-        allowSkipMenuItem = NSMenuItem(title: L10n.allowSkipBreak, action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
-        allowSkipMenuItem.target = self
-        allowSkipMenuItem.representedObject = SettingsKey.allowSkipBreak
-        menu.addItem(allowSkipMenuItem)
-
-        progressiveMenuItem = NSMenuItem(title: L10n.progressiveReminders, action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
-        progressiveMenuItem.target = self
-        progressiveMenuItem.representedObject = SettingsKey.progressiveReminders
-        menu.addItem(progressiveMenuItem)
-
-        muteSoundsMenuItem = NSMenuItem(title: L10n.muteSounds, action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
-        muteSoundsMenuItem.target = self
-        muteSoundsMenuItem.representedObject = SettingsKey.muteSounds
-        menu.addItem(muteSoundsMenuItem)
-
-        hideMenuBarTimerMenuItem = NSMenuItem(title: L10n.hideMenuBarTimer, action: #selector(toggleBoolSetting(_:)), keyEquivalent: "")
-        hideMenuBarTimerMenuItem.target = self
-        hideMenuBarTimerMenuItem.representedObject = SettingsKey.hideMenuBarTimer
-        menu.addItem(hideMenuBarTimerMenuItem)
-
-        menu.addItem(.separator())
-
-        launchAtLoginMenuItem = NSMenuItem(title: L10n.launchAtLogin, action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+        launchAtLoginMenuItem = NSMenuItem(
+            title: L10n.launchAtLogin,
+            action: #selector(toggleLaunchAtLogin),
+            keyEquivalent: ""
+        )
         launchAtLoginMenuItem.target = self
         menu.addItem(launchAtLoginMenuItem)
 
@@ -178,7 +175,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         let languageItem = NSMenuItem(title: L10n.languageLabel, action: nil, keyEquivalent: "")
         languageMenu = NSMenu()
         for lang in L10n.Language.allCases {
-            let item = NSMenuItem(title: lang.displayName, action: #selector(setLanguage(_:)), keyEquivalent: "")
+            let item = NSMenuItem(
+                title: lang.displayName,
+                action: #selector(setLanguage(_:)),
+                keyEquivalent: ""
+            )
             item.target = self
             item.representedObject = lang.rawValue
             languageMenu.addItem(item)
@@ -188,15 +189,79 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
 
         menu.addItem(.separator())
 
-        let aboutItem = NSMenuItem(title: L10n.about(AppConstants.appName), action: #selector(showAbout), keyEquivalent: "")
+        let aboutItem = NSMenuItem(
+            title: L10n.about(AppConstants.appName),
+            action: #selector(showAbout),
+            keyEquivalent: ""
+        )
         aboutItem.target = self
         menu.addItem(aboutItem)
 
-        let quitItem = NSMenuItem(title: L10n.quit(AppConstants.appName), action: #selector(quitApp), keyEquivalent: "q")
+        let quitItem = NSMenuItem(
+            title: L10n.quit(AppConstants.appName),
+            action: #selector(quitApp),
+            keyEquivalent: "q"
+        )
         quitItem.target = self
         menu.addItem(quitItem)
 
         statusItem.menu = menu
+    }
+
+    // MARK: - Settings submenus
+
+    private func makeWorkIntervalItem() -> NSMenuItem {
+        let item = NSMenuItem(title: L10n.workInterval, action: nil, keyEquivalent: "")
+        workIntervalMenu = NSMenu()
+        for minutes in workIntervalOptions {
+            let option = NSMenuItem(
+                title: L10n.minutes(minutes),
+                action: #selector(setWorkInterval(_:)),
+                keyEquivalent: ""
+            )
+            option.target = self
+            option.tag = minutes
+            workIntervalMenu.addItem(option)
+        }
+        item.submenu = workIntervalMenu
+        return item
+    }
+
+    private func makeBreakDurationItem() -> NSMenuItem {
+        let item = NSMenuItem(title: L10n.breakDuration, action: nil, keyEquivalent: "")
+        breakDurationMenu = NSMenu()
+        for seconds in breakDurationOptions {
+            let option = NSMenuItem(
+                title: formatBreakDuration(seconds),
+                action: #selector(setBreakDuration(_:)),
+                keyEquivalent: ""
+            )
+            option.target = self
+            option.tag = seconds
+            breakDurationMenu.addItem(option)
+        }
+        item.submenu = breakDurationMenu
+        return item
+    }
+
+    private func makePomodoroItem() -> NSMenuItem {
+        let item = NSMenuItem(title: L10n.pomodoroRhythm, action: nil, keyEquivalent: "")
+        pomodoroMenu = NSMenu()
+        for preset in pomodoroPresets {
+            let title = preset.every == 0
+                ? L10n.off
+                : L10n.longBreakPreset(every: preset.every, minutes: preset.seconds / 60)
+            let option = NSMenuItem(
+                title: title,
+                action: #selector(setPomodoroPreset(_:)),
+                keyEquivalent: ""
+            )
+            option.target = self
+            option.tag = preset.every * 10_000 + preset.seconds
+            pomodoroMenu.addItem(option)
+        }
+        item.submenu = pomodoroMenu
+        return item
     }
 
     // MARK: - NSMenuDelegate — update items right before the menu opens
@@ -211,10 +276,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     nonisolated func menuDidClose(_ menu: NSMenu) {
         MainActor.assumeIsolated {
             menuIsOpen = false
+            // The first open doubles as onboarding; dismiss it for good.
+            if showsWelcome {
+                showsWelcome = false
+                settings.markWelcomeCompleted()
+            }
         }
     }
 
     private func updateStatusText() {
+        if showsWelcome {
+            statusMenuItem.title = L10n.welcome
+            return
+        }
         switch timerManager.state {
         case .working:
             if timerManager.isInMeeting {
@@ -249,31 +323,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         restartMenuItem.isEnabled = timerManager.state != .onBreak
 
         // Work interval checkmarks
-        let currentWork = UserDefaults.standard.integer(forKey: SettingsKey.workDurationMinutes)
         for item in workIntervalMenu.items {
-            item.state = item.tag == currentWork ? .on : .off
+            item.state = item.tag == settings.workMinutes ? .on : .off
         }
 
         // Break duration checkmarks
-        let currentBreak = UserDefaults.standard.integer(forKey: SettingsKey.breakDurationSeconds)
         for item in breakDurationMenu.items {
-            item.state = item.tag == currentBreak ? .on : .off
+            item.state = item.tag == settings.breakSeconds ? .on : .off
         }
 
         // Pomodoro rhythm checkmark — both values must match a preset
-        let rhythmTag = UserDefaults.standard.integer(forKey: SettingsKey.longBreakEvery) * 10000
-            + UserDefaults.standard.integer(forKey: SettingsKey.longBreakSeconds)
+        let rhythmTag = settings.longBreakEvery * 10_000 + settings.longBreakSeconds
         for item in pomodoroMenu.items {
             item.state = item.tag == rhythmTag ? .on : .off
         }
 
-        // Toggle states
-        pauseDuringMeetingsMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.pauseDuringMeetings) ? .on : .off
-        pauseWhenIdleMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.pauseWhenIdle) ? .on : .off
-        allowSkipMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.allowSkipBreak) ? .on : .off
-        progressiveMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.progressiveReminders) ? .on : .off
-        muteSoundsMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.muteSounds) ? .on : .off
-        hideMenuBarTimerMenuItem.state = UserDefaults.standard.bool(forKey: SettingsKey.hideMenuBarTimer) ? .on : .off
+        // Boolean settings
+        for item in boolSettingItems {
+            guard let setting = BoolSetting(rawValue: item.tag) else { continue }
+            item.state = boolValue(for: setting) ? .on : .off
+        }
         launchAtLoginMenuItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
 
         // Language checkmarks
@@ -282,6 +351,36 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
             if let raw = item.representedObject as? String {
                 item.state = raw == currentLang ? .on : .off
             }
+        }
+    }
+
+    private func boolValue(for setting: BoolSetting) -> Bool {
+        switch setting {
+        case .pauseDuringMeetings: return settings.pauseDuringMeetings
+        case .pauseWhenLocked: return settings.pauseWhenLocked
+        case .allowSkipBreak: return settings.allowSkipBreak
+        case .progressiveReminders: return settings.progressiveReminders
+        case .muteSounds: return settings.muteSounds
+        case .hideMenuBarTimer: return settings.hideMenuBarTimer
+        }
+    }
+
+    private func setBool(_ value: Bool, for setting: BoolSetting) {
+        switch setting {
+        case .pauseDuringMeetings:
+            settings.setPauseDuringMeetings(value)
+            timerManager.pauseDuringMeetingsSettingChanged(enabled: value)
+        case .pauseWhenLocked:
+            settings.setPauseWhenLocked(value)
+            timerManager.pauseWhenLockedSettingChanged(enabled: value)
+        case .allowSkipBreak:
+            settings.setAllowSkipBreak(value)
+        case .progressiveReminders:
+            settings.setProgressiveReminders(value)
+        case .muteSounds:
+            settings.setMuteSounds(value)
+        case .hideMenuBarTimer:
+            settings.setHideMenuBarTimer(value)
         }
     }
 
@@ -320,13 +419,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         case .paused:
             switch timerManager.currentPauseReason {
             case .meeting, .breakPending: icon = "video.fill"
-            case .idle: icon = "moon.zzz"
+            case .locked: icon = "lock.fill"
             default: icon = "pause.circle"
             }
         }
 
         statusItem.button?.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)
-        if UserDefaults.standard.bool(forKey: SettingsKey.hideMenuBarTimer) {
+        if settings.hideMenuBarTimer {
             statusItem.button?.title = ""
         } else {
             statusItem.button?.title = " \(timerManager.menuBarText)"
@@ -350,41 +449,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
 
     @objc private func setWorkInterval(_ sender: NSMenuItem) {
         Log.info("Work interval changed to \(sender.tag) min")
-        UserDefaults.standard.set(sender.tag, forKey: SettingsKey.workDurationMinutes)
+        settings.setWorkMinutes(sender.tag)
         timerManager.workDurationSettingChanged()
     }
 
     @objc private func setBreakDuration(_ sender: NSMenuItem) {
         Log.info("Break duration changed to \(sender.tag)s")
-        UserDefaults.standard.set(sender.tag, forKey: SettingsKey.breakDurationSeconds)
+        settings.setBreakSeconds(sender.tag)
     }
 
     @objc private func setPomodoroPreset(_ sender: NSMenuItem) {
-        let every = sender.tag / 10000
-        let seconds = sender.tag % 10000
-        UserDefaults.standard.set(every, forKey: SettingsKey.longBreakEvery)
-        UserDefaults.standard.set(seconds, forKey: SettingsKey.longBreakSeconds)
+        let every = sender.tag / 10_000
+        let seconds = sender.tag % 10_000
+        settings.setLongBreak(every: every, seconds: seconds)
         Log.info("Pomodoro rhythm: every=\(every), longBreak=\(seconds)s")
     }
 
     @objc private func toggleBoolSetting(_ sender: NSMenuItem) {
-        guard let key = sender.representedObject as? String else { return }
-        let newValue = !UserDefaults.standard.bool(forKey: key)
-        UserDefaults.standard.set(newValue, forKey: key)
-        Log.info("Setting '\(key)' changed to \(newValue)")
-
-        // Some toggles need to reconcile the current timer state, otherwise
-        // disabling the feature while it's actively pausing the timer would
-        // leave the timer stranded (the resume path lives inside the gated
-        // periodic check).
-        switch key {
-        case SettingsKey.pauseDuringMeetings:
-            timerManager.pauseDuringMeetingsSettingChanged(enabled: newValue)
-        case SettingsKey.pauseWhenIdle:
-            timerManager.pauseWhenIdleSettingChanged(enabled: newValue)
-        default:
-            break
-        }
+        guard let setting = BoolSetting(rawValue: sender.tag) else { return }
+        let newValue = !boolValue(for: setting)
+        setBool(newValue, for: setting)
+        Log.info("Setting '\(setting)' changed to \(newValue)")
     }
 
     @objc private func setLanguage(_ sender: NSMenuItem) {

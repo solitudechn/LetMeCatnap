@@ -47,7 +47,7 @@ The break reminder also respects full screen apps. If you're watching a movie or
 3. When time's up, you will receive a gentle reminder to look away — or choose **Take a Break Now / 立即休息** whenever you need one
 4. Optionally take a longer break every N completed work sessions with **Pomodoro Rhythm / 番茄节奏** (manual breaks do not consume a work session)
 5. If you're on a call, the break waits until you're done
-6. If you step away from your computer, the timer pauses and resets when you return
+6. Lock your screen and step away — the timer pauses, and unlocks into a fresh cycle
 
 <div align="center">
   <img src="assets/menu.png" alt="iCanHazRepose menu" width="280"/>
@@ -63,11 +63,11 @@ iCanHazRepose checks the hardware directly. It uses CoreMediaIO to detect active
 
 This means it works with Zoom, Meet, FaceTime, Teams, Slack huddles, and whatever you end up using next year. Zero configuration.
 
-## Smart idle detection
+## Screen lock detection
 
-iCanHazRepose also detects when you've stepped away from your computer. If there's no keyboard or mouse activity for 60 seconds plus your configured short-break duration, the timer pauses — and resets to a full work cycle when you return, since you already took a real break.
+Most break apps pause on keyboard inactivity — but "no keyboard for two minutes" also describes reading a document, which is exactly when you need the reminder. iCanHazRepose waits for the signal that actually means you left: the screen locking, or the display going to sleep. Unlock and you get a fresh work cycle, because a locked screen is a real break.
 
-It's smart about passive screen use too: if you're watching a video (where apps keep the display awake), the timer keeps running so you still get break reminders.
+The break screen hides its countdown after three seconds and puts the guidance front and centre — staring at a ticking number is the opposite of resting your eyes. Tap the ring to see the time left. Escape always closes a break.
 
 ## Install
 
@@ -95,6 +95,18 @@ cd iCanHazRepose
 ```
 
 Requires Xcode 15+ and macOS 13+.
+
+## Tests
+
+Timing rules and settings live in a separate `ICHRCore` module so they can be
+tested without AppKit:
+
+```
+swift test --filter ICHRCoreTests   # needs a full Xcode (XCTest)
+python3 scripts/check-l10n.py       # both languages complete, no stray literals
+```
+
+Both run in CI on every push.
 
 ## Localization / 界面语言
 

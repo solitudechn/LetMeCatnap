@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Carbon
+import ICHRCore
 
 private class KeyablePanel: NSPanel {
     override var canBecomeKey: Bool { true }
@@ -146,7 +147,7 @@ class OverlayManager {
     }
 
     private func installKeyMonitor(timerManager: TimerManager) {
-        let allowSkip = UserDefaults.standard.bool(forKey: SettingsKey.allowSkipBreak)
+        let allowSkip = Settings.shared.allowSkipBreak
         guard allowSkip else { return }
 
         registerEscapeHotkey { [weak timerManager] in

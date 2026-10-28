@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ICHRCore
 
 struct BreakOverlayView: View {
     @ObservedObject var timerManager: TimerManager
@@ -7,6 +8,11 @@ struct BreakOverlayView: View {
     @State private var breathe = false
     @State private var appeared = false
     @State private var ringProgress: CGFloat = 0
+    /// The countdown is only shown for a few seconds: a break screen whose
+    /// centrepiece is a ticking number invites you to stare at the screen,
+    /// which is the opposite of what a break is for.
+    @State private var countdownVisible = true
+    @State private var revealTick = 0
 
     private var reduceMotion: Bool {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -79,6 +85,12 @@ struct BreakOverlayView: View {
                             .opacity(reduceMotion ? 1 : timerManager.graceProgress)
                             .animation(.easeOut(duration: 1), value: timerManager.graceProgress)
                     }
+                    .opacity(countdownVisible ? 1 : 0.16)
+                    .scaleEffect(countdownVisible ? 1 : 0.9)
+                    .animation(.easeInOut(duration: 0.7), value: countdownVisible)
+                    .contentShape(Circle())
+                    .onTapGesture { revealTick += 1 }
+                    .help(L10n.showRemaining)
 
                     VStack(spacing: 10) {
                         Text(timerManager.isLongBreak ? L10n.longBreakTitle : L10n.timeToRest)
@@ -93,10 +105,25 @@ struct BreakOverlayView: View {
                             .opacity(appeared ? 1 : 0)
                             .offset(y: appeared ? 0 : 8)
                             .animation(.easeInOut(duration: 0.4), value: timerManager.breakTip)
+
+                        if !countdownVisible {
+                            Text(L10n.showRemaining)
+                                .font(.system(size: 11, weight: .regular))
+                                .foregroundStyle(.white.opacity(0.18))
+                                .opacity(appeared ? 1 : 0)
+                        }
                     }
 
-                    // Skip button — hidden when progressive reminders made this
-                    // break mandatory.
+                    // A nudge after repeated skips — the break can still be
+                    // skipped, this only makes the choice visible.
+                    if timerManager.showsSkipHint {
+                        Text(L10n.skipHint)
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.3))
+                            .opacity(appeared ? 1 : 0)
+                    }
+
+                    // Skip button
                     if timerManager.canSkipBreak {
                         Button(action: { timerManager.skipBreak() }) {
                             HStack(spacing: 10) {
@@ -121,11 +148,6 @@ struct BreakOverlayView: View {
                                 NSCursor.pop()
                             }
                         }
-                    } else if timerManager.isBreakMandatory {
-                        Text(L10n.breakMandatory)
-                            .font(.system(size: 13, weight: .regular))
-                            .foregroundStyle(.white.opacity(0.3))
-                            .opacity(appeared ? 1 : 0)
                     }
 
                     Spacer()
@@ -147,6 +169,18 @@ struct BreakOverlayView: View {
         }
         .onChangeCompat(of: timerManager.remainingSeconds) {
             updateRingProgress()
+        }
+        // Show the countdown briefly on entry (and whenever the user taps the
+        // ring), then let it recede so the guidance line is what you look at.
+        .task(id: revealTick) {
+            countdownVisible = true
+            try? await Task.sleep(
+                nanoseconds: UInt64(TimerRules.countdownVisibleSeconds * 1_000_000_000)
+            )
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.7)) {
+                countdownVisible = false
+            }
         }
     }
 
