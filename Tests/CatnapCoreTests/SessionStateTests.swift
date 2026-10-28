@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import ICHRCore
+@testable import CatnapCore
 
 /// The state machine, driven without a screen, a timer or `UserDefaults`.
 ///

@@ -6,9 +6,9 @@ name: Release
 #
 # Updates are delivered by Sparkle (see src/Updater.swift). Every release must
 # publish three things together:
-#   - `iCHR.zip`     the update archive Sparkle downloads (exact name)
+#   - `LetMeCatnap.zip`     the update archive Sparkle downloads (exact name)
 #   - `appcast.xml`  the feed, signed with the EdDSA key from Info.plist
-#   - a release title that starts with "iCanHazRepose <x.y.z>" (for humans)
+#   - a release title that starts with "LetMeCatnap <x.y.z>" (for humans)
 # `SUFeedURL` points at releases/latest/download/appcast.xml, so publishing a
 # release is what makes an update visible — no separate feed host.
 #
@@ -117,21 +117,21 @@ jobs:
             echo "::error::No 'Developer ID Application' identity in the imported certificate"
             exit 1
           fi
-          echo "ICHR_SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+          echo "CATNAP_SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
           echo "Signing as: $IDENTITY"
 
       - name: Configure notarization
         if: env.MACOS_CERT_P12 != '' && env.NOTARY_APPLE_ID != ''
         run: |
           set -euo pipefail
-          xcrun notarytool store-credentials "ichr-ci" \
+          xcrun notarytool store-credentials "letmecatnap-ci" \
             --apple-id "$NOTARY_APPLE_ID" \
             --team-id "$NOTARY_TEAM_ID" \
             --password "$NOTARY_APP_PASSWORD"
-          echo "ICHR_NOTARY_PROFILE=ichr-ci" >> "$GITHUB_ENV"
+          echo "CATNAP_NOTARY_PROFILE=letmecatnap-ci" >> "$GITHUB_ENV"
 
       - name: Run core tests
-        run: swift test --filter ICHRCoreTests
+        run: swift test --filter CatnapCoreTests
 
       - name: Check localization
         run: python3 scripts/check-l10n.py
@@ -152,7 +152,7 @@ jobs:
 
       - name: Build
         env:
-          ICHR_VERSION: ${{ steps.version.outputs.version }}
+          CATNAP_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -o pipefail
           ./build.sh ci 2>&1 | tee build-console.log
@@ -174,27 +174,27 @@ jobs:
       - name: Verify artifacts
         run: |
           set -euo pipefail
-          test -f dist/iCHR.zip || { echo "::error::dist/iCHR.zip missing"; exit 1; }
+          test -f dist/LetMeCatnap.zip || { echo "::error::dist/LetMeCatnap.zip missing"; exit 1; }
           # Sparkle must be inside the bundle and reachable through the rpath,
           # otherwise every copy except the one on the build machine fails to
           # launch with a dyld error.
-          test -d dist/iCanHazRepose.app/Contents/Frameworks/Sparkle.framework || {
+          test -d dist/LetMeCatnap.app/Contents/Frameworks/Sparkle.framework || {
             echo "::error::Sparkle.framework was not embedded"
             exit 1
           }
-          otool -L dist/iCanHazRepose.app/Contents/MacOS/iCanHazRepose | grep -q "@rpath/Sparkle.framework" || {
+          otool -L dist/LetMeCatnap.app/Contents/MacOS/LetMeCatnap | grep -q "@rpath/Sparkle.framework" || {
             echo "::error::executable is not linked against Sparkle"
             exit 1
           }
           # The updater requires this exact asset name and a matching version.
           BUILT="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' \
-            'dist/iCanHazRepose.app/Contents/Info.plist')"
+            'dist/LetMeCatnap.app/Contents/Info.plist')"
           test "$BUILT" = "${{ steps.version.outputs.version }}" || {
             echo "::error::Bundle version $BUILT != ${{ steps.version.outputs.version }}"
             exit 1
           }
-          lipo -archs dist/iCanHazRepose.app/Contents/MacOS/iCanHazRepose
-          unzip -l dist/iCHR.zip | head -10
+          lipo -archs dist/LetMeCatnap.app/Contents/MacOS/LetMeCatnap
+          unzip -l dist/LetMeCatnap.zip | head -10
 
       - name: Generate appcast
         env:
@@ -216,7 +216,7 @@ jobs:
           }
 
           mkdir -p feed
-          cp dist/iCHR.zip feed/
+          cp dist/LetMeCatnap.zip feed/
           # `--ed-key-file -` keeps the private key off disk and out of argv.
           printf '%s\n' "$SPARKLE_ED_PRIVATE_KEY" | "$TOOLS/generate_appcast" \
             --ed-key-file - \
@@ -251,18 +251,19 @@ jobs:
             echo "简体中文版 · Universal binary (Apple Silicon + Intel) · macOS 13+"
             echo
             echo "### 安装 / Install"
-            echo '1. 下载 `iCHR.dmg`，把 `iCanHazRepose.app` 拖进“应用程序”。'
+            echo '1. 下载 `LetMeCatnap.dmg`，把 `LetMeCatnap.app` 拖进“应用程序”。'
             echo '2. 首次打开若提示“已损坏”或“无法验证开发者”，在终端执行：'
             echo
             echo '```sh'
-            echo 'xattr -dr com.apple.quarantine /Applications/iCanHazRepose.app'
+            echo 'xattr -dr com.apple.quarantine /Applications/LetMeCatnap.app'
             echo '```'
             echo
-            echo '3. 也可以直接用 `iCHR.zip`（应用内自动更新使用的就是这个包）。'
+            echo '3. 也可以直接用 `LetMeCatnap.zip`（应用内自动更新使用的就是这个包）。'
             echo
-            # 1.1.0 换了 bundle id 和更新器，这两件事用户必须知道。
+            # 1.1.0 换了名字、bundle id 和更新器，这三件事用户必须知道。
             if [ "$VERSION" = "1.1.0" ]; then
               echo "### 这个版本有什么变化 / What's new"
+              echo '- **改名为 LetMeCatnap**：应用名、图标、bundle id 都换了，可以和原版（iCanHazRepose）并存。'
               echo '- **从 1.0.x 升级需要手动安装一次**：bundle id 改了，旧版更新器会拒绝替换。设置会自动迁移。'
               echo '- 更新改用 Sparkle：更新包带签名校验，下载或安装失败会明确提示，不再静默。'
               echo '- 休息遮罩**随时可以用 Esc 退出**；菜单里的「允许跳过休息」改成了「显示跳过按钮」，只决定按钮显不显示。'
@@ -283,8 +284,8 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          ASSETS=(dist/iCHR.zip)
-          if [ -f dist/iCHR.dmg ]; then ASSETS+=(dist/iCHR.dmg); fi
+          ASSETS=(dist/LetMeCatnap.zip)
+          if [ -f dist/LetMeCatnap.dmg ]; then ASSETS+=(dist/LetMeCatnap.dmg); fi
           # The feed lives next to the archive so `releases/latest/download/
           # appcast.xml` always resolves to the newest published build.
           test -f dist/appcast.xml || { echo "::error::dist/appcast.xml missing"; exit 1; }
@@ -294,6 +295,6 @@ jobs:
             gh release upload "v$VERSION" "${ASSETS[@]}" --clobber
           else
             gh release create "v$VERSION" "${ASSETS[@]}" \
-              --title "iCanHazRepose $VERSION" \
+              --title "LetMeCatnap $VERSION" \
               --notes-file "$RUNNER_TEMP/notes.md"
           fi

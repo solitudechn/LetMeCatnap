@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import ICHRCore
+@testable import CatnapCore
 
 /// Guards the string table itself. Every failure here would otherwise reach the
 /// user as a missing, half-translated or `%ld`-mangled label.

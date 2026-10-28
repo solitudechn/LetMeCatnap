@@ -2,7 +2,7 @@
 """Localization guard for the bilingual string table.
 
 The table itself is type-checked by the compiler and unit-tested by
-`Tests/ICHRCoreTests/StringTableTests.swift`. This script covers what neither
+`Tests/CatnapCoreTests/StringTableTests.swift`. This script covers what neither
 can see — source text that never goes through `L10n` at all — plus a couple of
 cheap structural checks so the failure is reported in CI even if XCTest is
 unavailable.

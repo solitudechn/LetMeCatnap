@@ -16,3 +16,6 @@ dist/
 .workbuddy/
 build.log
 build-console.log
+
+# Intermediate output of scripts/make-icon.swift (the .icns itself is committed)
+res/main.iconset/

@@ -1,8 +1,8 @@
 <div align="center">
-  <img src="assets/icon.png" width="128" height="128" alt="iCanHazRepose icon"/>
-  <h1>iCanHazRepose</h1>
+  <img src="assets/icon.png" width="128" height="128" alt="LetMeCatnap icon"/>
+  <h1>LetMeCatnap</h1>
   <p><strong>Take breaks from your screen. Without interrupting your meetings.</strong></p>
-  <a href="https://github.com/solitudechn/iCanHazRepose/releases/latest/download/iCHR.dmg">
+  <a href="https://github.com/solitudechn/iCanHazRepose/releases/latest/download/LetMeCatnap.dmg">
     <img src="assets/download-button.svg" alt="Download for Mac">
   </a>
   <p><sub>Free and open source. Requires macOS 13+. 简体中文界面。</sub></p>
@@ -14,7 +14,7 @@
 <br/>
 
 <div align="center">
-  <img src="assets/break-overlay.png" alt="iCanHazRepose break screen" width="480"/>
+  <img src="assets/break-overlay.png" alt="LetMeCatnap break screen" width="480"/>
 </div>
 
 <br/>
@@ -22,24 +22,25 @@
 <div align="center">
   <a href="https://github.com/fikrikarim/repose">originally created by Fikri Karim</a> ·
   <a href="https://github.com/deseven/iCanHazRepose">upstream maintained by deseven</a> ·
-  <a href="https://github.com/solitudechn/iCanHazRepose">简体中文 fork</a>
+  <a href="https://github.com/solitudechn/iCanHazRepose">this build</a>
 </div>
 
 <br/>
 
-> **This is a fork.** It adds an English / 简体中文 UI and a few deliberate
-> behaviour changes on top of
-> [deseven/iCanHazRepose](https://github.com/deseven/iCanHazRepose), ships under
-> its own bundle identifier (`io.github.solitudechn.icanhazrepose`) and its own
-> signed update feed, so it installs next to the original instead of replacing
-> it. Bug reports for *this* build — the localization, the changed behaviours,
-> the updater — belong here; questions about the original belong upstream.
+> **This started as a fork and grew into its own app.** LetMeCatnap is based on
+> [deseven/iCanHazRepose](https://github.com/deseven/iCanHazRepose): it adds an
+> English / 简体中文 UI and changes a few deliberate behaviours (breaks you can
+> always leave, pause triggers you choose, Sparkle for updates). It ships under
+> its own name and bundle identifier (`io.github.solitudechn.letmecatnap`) with
+> its own signed update feed, so it installs next to the original instead of
+> replacing it. Bug reports for *this* build belong here; questions about the
+> original belong upstream.
 
 <br/>
 
-iCanHazRepose lives in your menu bar, counts down your work interval, and dims your screen when it's time to rest your eyes. When the break ends, the cycle starts again.
+LetMeCatnap lives in your menu bar, counts down your work interval, and dims your screen when it's time to rest your eyes. When the break ends, the cycle starts again.
 
-The difference from every other break reminder: **iCanHazRepose detects when you're in a meeting and stays out of your way.** No calendar integration, no app-specific setup. If your camera or mic is active, it knows you're on a call and waits.
+The difference from every other break reminder: **LetMeCatnap detects when you're in a meeting and stays out of your way.** No calendar integration, no app-specific setup. If your camera or mic is active, it knows you're on a call and waits.
 
 The break reminder also respects full screen apps. If you're watching a movie or playing a game a small panel appears in the middle of the screen that doesn't block any input and can be dismissed by pressing Escape.
 
@@ -56,7 +57,7 @@ The break reminder also respects full screen apps. If you're watching a movie or
 8. During the break you get a short tip ("look 20 feet away", "roll your shoulders") instead of a ticking clock — on the full-screen overlay the countdown fades out after three seconds; click the ring to bring it back. (The small panel used over full-screen apps keeps its countdown visible, because it is click-through and there would be no way to recall it.)
 
 <div align="center">
-  <img src="assets/menu.png" alt="iCanHazRepose menu" width="280"/>
+  <img src="assets/menu.png" alt="LetMeCatnap menu" width="280"/>
 </div>
 
 Everything is in the menu — pause, resume, restart, all settings. No separate preferences window.
@@ -65,13 +66,13 @@ Everything is in the menu — pause, resume, restart, all settings. No separate 
 
 Most break apps check your calendar or look for specific apps running. Both break easily — your calendar doesn't know about the impromptu call your manager just started, and "Zoom is open" doesn't mean you're in a meeting.
 
-iCanHazRepose checks the hardware directly. It uses CoreMediaIO to detect active cameras and CoreAudio for microphones. If something is using your camera or mic right now, you're probably in a call, so it backs off.
+LetMeCatnap checks the hardware directly. It uses CoreMediaIO to detect active cameras and CoreAudio for microphones. If something is using your camera or mic right now, you're probably in a call, so it backs off.
 
 This means it works with Zoom, Meet, FaceTime, Teams, Slack huddles, and whatever you end up using next year. Zero configuration.
 
 ## When the timer pauses
 
-Most break apps pause on keyboard inactivity — but "no keyboard for two minutes" also describes reading a document, which is exactly when you need the reminder. By default iCanHazRepose waits for the signal that actually means you left: the screen locking, or the display going to sleep. Unlock and you get a fresh work cycle, because a locked screen is a real break.
+Most break apps pause on keyboard inactivity — but "no keyboard for two minutes" also describes reading a document, which is exactly when you need the reminder. By default LetMeCatnap waits for the signal that actually means you left: the screen locking, or the display going to sleep. Unlock and you get a fresh work cycle, because a locked screen is a real break.
 
 If you never lock your screen, **Reminders → Pause When** offers the idle-based behaviour instead: pause only (`Idle for 5 Minutes`), both signals (`Screen Locks or Idle`), or never pause automatically. Idle is opt-in because it is the noisy one — five minutes without input is the threshold, so reading a document is no longer mistaken for leaving.
 
@@ -87,7 +88,7 @@ The download is not notarized, so the first launch may be blocked by Gatekeeper
 ("damaged" / "cannot be verified"). Clear the quarantine flag once:
 
 ```sh
-xattr -dr com.apple.quarantine /Applications/iCanHazRepose.app
+xattr -dr com.apple.quarantine /Applications/LetMeCatnap.app
 ```
 
 **Dev** build — every push to `main` is compiled by CI; grab the artifact from the
@@ -107,7 +108,7 @@ the SwiftUI macros). If `xcode-select` still points at CLT after installing
 Xcode, `build.sh` picks the newest `/Applications/Xcode*.app` by itself.
 
 `./build.sh` builds a debug binary and launches it; `./build.sh ci` produces the
-same artifacts as a release (universal binary, `iCHR.zip`, `iCHR.dmg`) without
+same artifacts as a release (universal binary, `LetMeCatnap.zip`, `LetMeCatnap.dmg`) without
 uploading or launching anything.
 
 ## Updates
@@ -128,7 +129,7 @@ Updates…** in the menu. Skip a version and Sparkle stops offering it.
 
 ## Tests and checks
 
-Timing rules, the timer's state machine, settings and the string table live in the `ICHRCore`
+Timing rules, the timer's state machine, settings and the string table live in the `CatnapCore`
 module so they can be tested without AppKit:
 
 ```
@@ -138,7 +139,7 @@ module so they can be tested without AppKit:
 Individually:
 
 ```
-swift test --filter ICHRCoreTests   # needs a full Xcode (XCTest)
+swift test --filter CatnapCoreTests   # needs a full Xcode (XCTest)
 python3 scripts/check-l10n.py       # every key translated, no stray literals
 swift format lint --recursive --strict src core Tests
 ```
@@ -148,16 +149,16 @@ All of them run in CI on every push.
 ## Troubleshooting / 日志
 
 The app keeps a rotating log at
-`~/Library/Logs/iCanHazRepose/iCanHazRepose.log` — every state change, every
+`~/Library/Logs/LetMeCatnap/LetMeCatnap.log` — every state change, every
 update check, every failure. When something looks wrong, that file is the first
 thing to attach to a bug report.
 
 ```sh
-tail -f ~/Library/Logs/iCanHazRepose/iCanHazRepose.log
+tail -f ~/Library/Logs/LetMeCatnap/LetMeCatnap.log
 ```
 
 应用会把所有状态变化、检查更新结果和失败原因写进
-`~/Library/Logs/iCanHazRepose/iCanHazRepose.log`（超过 1 MB 自动滚动），
+`~/Library/Logs/LetMeCatnap/LetMeCatnap.log`（超过 1 MB 自动滚动），
 反馈问题时请附上这个文件。
 
 ## Known behaviour

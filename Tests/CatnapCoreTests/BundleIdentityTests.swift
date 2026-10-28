@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import ICHRCore
+@testable import CatnapCore
 
 /// Guards the values that break the app silently when they drift apart.
 ///
@@ -10,7 +10,7 @@ import XCTest
 /// an app whose settings vanish.
 final class BundleIdentityTests: XCTestCase {
     /// `Info.plist` lives at the repository root, three directories up from this
-    /// file (`Tests/ICHRCoreTests/`).
+    /// file (`Tests/CatnapCoreTests/`).
     private static let infoPlistURL = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
@@ -55,6 +55,24 @@ final class BundleIdentityTests: XCTestCase {
         XCTAssertNotNil(
             version?.range(of: #"^\d+\.\d+\.\d+$"#, options: .regularExpression),
             "version \(version ?? "?") is not of the form x.y.z"
+        )
+    }
+
+    /// Every identifier this app has ever shipped under must stay in the
+    /// migration list, otherwise renaming the app silently resets the settings
+    /// of everyone who installed a previous build.
+    func testEveryPreviousIdentifierIsStillMigrated() {
+        XCTAssertTrue(
+            BundleIdentity.legacyIdentifiers.contains("io.github.solitudechn.icanhazrepose"),
+            "the 1.1.0-era identifier was dropped from the migration list"
+        )
+        XCTAssertTrue(
+            BundleIdentity.legacyIdentifiers.contains("wtf.d7.icanhazrepose"),
+            "the upstream identifier was dropped from the migration list"
+        )
+        XCTAssertFalse(
+            BundleIdentity.legacyIdentifiers.contains(BundleIdentity.identifier),
+            "the current identifier is not a legacy one"
         )
     }
 }

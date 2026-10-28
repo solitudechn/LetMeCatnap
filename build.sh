@@ -2,8 +2,7 @@
 
 set -euo pipefail
 
-name="iCanHazRepose"
-shortName="iCHR"
+name="LetMeCatnap"
 loc="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 logFile="$loc/build.log"
 logMark=1
@@ -63,13 +62,13 @@ fi
 
 # Optional: inject the version into the bundle (used by CI, where the
 # version comes from the git tag instead of Info.plist).
-ICHR_VERSION="${ICHR_VERSION:-}"
-ICHR_VERSION="${ICHR_VERSION#v}"
+CATNAP_VERSION="${CATNAP_VERSION:-}"
+CATNAP_VERSION="${CATNAP_VERSION#v}"
 
-# Extra flags for every `swift` invocation. Set `ICHR_SWIFT_FLAGS=--disable-sandbox`
+# Extra flags for every `swift` invocation. Set `CATNAP_SWIFT_FLAGS=--disable-sandbox`
 # where SwiftPM's manifest sandbox cannot run (nested sandboxes, some CI
 # containers); it is not needed on a normal machine or on GitHub's runners.
-swiftExtra="${ICHR_SWIFT_FLAGS:-}"
+swiftExtra="${CATNAP_SWIFT_FLAGS:-}"
 
 # ── Toolchain ────────────────────────────────────────────────────────
 # SwiftUI macros (@State and friends) only resolve against a full Xcode.
@@ -105,11 +104,11 @@ if command -v share >/dev/null 2>&1; then
     can_upload=true
 fi
 
-if [ -n "${ICHR_SIGNING_IDENTITY:-}" ] && [ "$mode" != "dev" ]; then
+if [ -n "${CATNAP_SIGNING_IDENTITY:-}" ] && [ "$mode" != "dev" ]; then
     can_sign=true
-    if [ -n "${ICHR_NOTARY_PROFILE:-}" ]; then
+    if [ -n "${CATNAP_NOTARY_PROFILE:-}" ]; then
         can_notarize=true
-    elif [ -n "${ICHR_APPLE_ID:-}" ] && [ -n "${ICHR_TEAM_ID:-}" ] && [ -n "${ICHR_APP_PASSWORD:-}" ]; then
+    elif [ -n "${CATNAP_APPLE_ID:-}" ] && [ -n "${CATNAP_TEAM_ID:-}" ] && [ -n "${CATNAP_APP_PASSWORD:-}" ]; then
         can_notarize=true
     fi
 fi
@@ -171,7 +170,7 @@ run_step() {
 # ── Step functions ───────────────────────────────────────────────────
 
 do_init_log() {
-    echo "=== iCanHazRepose build log ===" > "$logFile"
+    echo "=== LetMeCatnap build log ===" > "$logFile"
     echo "Date: $(date)" >> "$logFile"
     echo "Mode: $mode" >> "$logFile"
     echo "Signing: $can_sign" >> "$logFile"
@@ -193,9 +192,9 @@ do_init_log() {
 
 do_clean_dist() {
     rm -rf "$loc/dist/$name.app"
-    rm -rf "$loc/dist/$shortName.zip"
-    rm -rf "$loc/dist/$shortName-dev.zip"
-    rm -rf "$loc/dist/$shortName.dmg"
+    rm -rf "$loc/dist/$name.zip"
+    rm -rf "$loc/dist/$name-dev.zip"
+    rm -rf "$loc/dist/$name.dmg"
     rm -rf "$loc/dist/$name"
     mkdir -p "$loc/dist"
 }
@@ -265,11 +264,11 @@ do_create_bundle() {
     cp "$loc/LICENSE" "$loc/dist/$name.app/Contents/Resources/"
 
     # Override the version when the caller supplies one (git tag in CI).
-    if [ -n "$ICHR_VERSION" ]; then
+    if [ -n "$CATNAP_VERSION" ]; then
         local plist="$loc/dist/$name.app/Contents/Info.plist"
-        /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $ICHR_VERSION" "$plist"
-        /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $ICHR_VERSION" "$plist"
-        echo "version set to $ICHR_VERSION"
+        /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $CATNAP_VERSION" "$plist"
+        /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $CATNAP_VERSION" "$plist"
+        echo "version set to $CATNAP_VERSION"
     fi
 }
 
@@ -338,7 +337,7 @@ sign_code() {
     local target="$1"
     local pin="$2"
     if [ "$can_sign" = true ]; then
-        codesign --force --sign "$ICHR_SIGNING_IDENTITY" --options runtime --timestamp "$target"
+        codesign --force --sign "$CATNAP_SIGNING_IDENTITY" --options runtime --timestamp "$target"
     elif [ "$pin" = "yes" ]; then
         # Without a stable designated requirement the ad-hoc signature degrades to
         # a cdhash, which changes on every build.
@@ -359,7 +358,7 @@ do_create_zip() {
 
 do_create_dmg() {
     local dmgStaging="$loc/dist/dmg_staging"
-    local dmgPath="$loc/dist/$shortName.dmg"
+    local dmgPath="$loc/dist/$name.dmg"
     rm -rf "$dmgStaging"
     mkdir -p "$dmgStaging"
     cp -R "$loc/dist/$name.app" "$dmgStaging/"
@@ -404,18 +403,18 @@ do_create_dmg() {
 }
 
 do_sign_dmg() {
-    codesign --force --sign "$ICHR_SIGNING_IDENTITY" --timestamp "$loc/dist/$shortName.dmg"
+    codesign --force --sign "$CATNAP_SIGNING_IDENTITY" --timestamp "$loc/dist/$name.dmg"
 }
 
 do_notarize() {
     local file="$1"
-    if [ -n "${ICHR_NOTARY_PROFILE:-}" ]; then
-        xcrun notarytool submit "$file" --keychain-profile "$ICHR_NOTARY_PROFILE" --wait
+    if [ -n "${CATNAP_NOTARY_PROFILE:-}" ]; then
+        xcrun notarytool submit "$file" --keychain-profile "$CATNAP_NOTARY_PROFILE" --wait
     else
         xcrun notarytool submit "$file" \
-            --apple-id "$ICHR_APPLE_ID" \
-            --team-id "$ICHR_TEAM_ID" \
-            --password "$ICHR_APP_PASSWORD" \
+            --apple-id "$CATNAP_APPLE_ID" \
+            --team-id "$CATNAP_TEAM_ID" \
+            --password "$CATNAP_APP_PASSWORD" \
             --wait
     fi
 }
@@ -425,7 +424,7 @@ do_staple_app() {
 }
 
 do_staple_dmg() {
-    xcrun stapler staple "$loc/dist/$shortName.dmg"
+    xcrun stapler staple "$loc/dist/$name.dmg"
 }
 
 do_verify() {
@@ -434,9 +433,9 @@ do_verify() {
         xcrun stapler validate "$loc/dist/$name.app"
     fi
     if [ "$mode" = "release" ]; then
-        spctl -a -vvv "$loc/dist/$shortName.dmg"
+        spctl -a -vvv "$loc/dist/$name.dmg"
         if [ "$can_notarize" = true ]; then
-            xcrun stapler validate "$loc/dist/$shortName.dmg"
+            xcrun stapler validate "$loc/dist/$name.dmg"
         fi
     fi
 }
@@ -497,10 +496,10 @@ do_clean_dist
 
 run_step "Resolving dependencies..."            "failed to resolve dependencies"           do_resolve_deps
 run_step "Cleaning build artifacts..."           "failed to clean build artifacts"          do_clean_build
-run_step "Compiling Swift sources (arm64)..."    "failed to compile $shortName for arm64"   do_compile_arm64
+run_step "Compiling Swift sources (arm64)..."    "failed to compile $name for arm64"   do_compile_arm64
 
 if [ "$mode" != "dev" ]; then
-    run_step "Compiling Swift sources (x86_64)..." "failed to compile $shortName for x86_64" do_compile_x86_64
+    run_step "Compiling Swift sources (x86_64)..." "failed to compile $name for x86_64" do_compile_x86_64
     run_step "Creating universal binary..."        "failed to create universal binary"        do_create_universal
 fi
 
@@ -510,13 +509,13 @@ run_step "Code-signing APP bundle..."             "failed to code-sign app bundl
 
 if [ "$mode" != "dev" ]; then
     if [ "$mode" = "release" ] || [ "$mode" = "ci" ]; then
-        run_step "Creating distribution ZIP..."    "failed to pack $shortName.zip"            do_create_zip "$shortName.zip"
+        run_step "Creating distribution ZIP..."    "failed to pack $name.zip"            do_create_zip "$name.zip"
         run_step "Creating distribution DMG..."    "failed to create dmg"                     do_create_dmg
         if [ "$can_sign" = true ]; then
             run_step "Signing distribution DMG..." "failed to sign dmg"                       do_sign_dmg
         fi
         if [ "$can_notarize" = true ]; then
-            run_step "Notarizing release build..." "failed to notarize release build"         do_notarize "$loc/dist/$shortName.dmg"
+            run_step "Notarizing release build..." "failed to notarize release build"         do_notarize "$loc/dist/$name.dmg"
             run_step "Stapling APP bundle..."      "failed to staple app bundle"              do_staple_app
             run_step "Stapling release DMG..."     "failed to staple release DMG"             do_staple_dmg
         fi
@@ -526,16 +525,16 @@ if [ "$mode" != "dev" ]; then
             run_step "Verifying signatures..."     "failed to verify signatures"              do_verify
         fi
     else
-        run_step "Creating dev ZIP..."             "failed to pack $shortName-dev.zip"        do_create_zip "$shortName-dev.zip"
+        run_step "Creating dev ZIP..."             "failed to pack $name-dev.zip"        do_create_zip "$name-dev.zip"
         if [ "$can_notarize" = true ]; then
-            run_step "Notarizing dev build..."     "failed to notarize dev build"             do_notarize "$loc/dist/$shortName-dev.zip"
+            run_step "Notarizing dev build..."     "failed to notarize dev build"             do_notarize "$loc/dist/$name-dev.zip"
             run_step "Stapling APP bundle..."      "failed to staple app bundle"              do_staple_app
         fi
         if [ "$can_sign" = true ]; then
             run_step "Verifying signatures..."     "failed to verify signatures"              do_verify
         fi
         if [ "$can_upload" = true ]; then
-            run_step "Uploading dev build..."      "failed to upload dev build"               do_upload "$loc/dist/$shortName-dev.zip"
+            run_step "Uploading dev build..."      "failed to upload dev build"               do_upload "$loc/dist/$name-dev.zip"
         fi
     fi
 fi
@@ -556,7 +555,7 @@ case "$mode" in
         echo -e "  ${dimColor}mode: development release${noColor}"
         echo -e "  ${dimColor}signing: $(if [ "$can_sign" = true ]; then echo "${greenColor}Developer ID${noColor}"; else echo "${redColor}ad-hoc${noColor}"; fi)"
         echo -e "  ${dimColor}notarized: $(if [ "$can_notarize" = true ]; then echo "${greenColor}yes${noColor}"; else echo "${redColor}no${noColor}"; fi)"
-        echo -e "  ${dimColor}artifacts: dist/$name.app  dist/$shortName-dev.zip${noColor}"
+        echo -e "  ${dimColor}artifacts: dist/$name.app  dist/$name-dev.zip${noColor}"
         if [ "$can_upload" = false ]; then
             echo -e "  ${dimColor}upload skipped: 'share' not installed${noColor}"
         fi
@@ -565,15 +564,15 @@ case "$mode" in
         echo -e "  ${dimColor}mode: release${noColor}"
         echo -e "  ${dimColor}signing: $(if [ "$can_sign" = true ]; then echo "${greenColor}Developer ID${noColor}"; else echo "${redColor}ad-hoc${noColor}"; fi)"
         echo -e "  ${dimColor}notarized: $(if [ "$can_notarize" = true ]; then echo "${greenColor}yes${noColor}"; else echo "${redColor}no${noColor}"; fi)"
-        echo -e "  ${dimColor}artifacts: dist/$name.app  dist/$shortName.zip  dist/$shortName.dmg${noColor}"
+        echo -e "  ${dimColor}artifacts: dist/$name.app  dist/$name.zip  dist/$name.dmg${noColor}"
         ;;
     ci)
-        ciArtifacts="dist/$name.app  dist/$shortName.zip"
-        if [ -f "$loc/dist/$shortName.dmg" ]; then
-            ciArtifacts="$ciArtifacts  dist/$shortName.dmg"
+        ciArtifacts="dist/$name.app  dist/$name.zip"
+        if [ -f "$loc/dist/$name.dmg" ]; then
+            ciArtifacts="$ciArtifacts  dist/$name.dmg"
         fi
         echo -e "  ${dimColor}mode: ci${noColor}"
-        echo -e "  ${dimColor}version: ${ICHR_VERSION:-<from Info.plist>}${noColor}"
+        echo -e "  ${dimColor}version: ${CATNAP_VERSION:-<from Info.plist>}${noColor}"
         echo -e "  ${dimColor}signing: $(if [ "$can_sign" = true ]; then echo "${greenColor}Developer ID${noColor}"; else echo "${redColor}ad-hoc${noColor}"; fi)"
         echo -e "  ${dimColor}notarized: $(if [ "$can_notarize" = true ]; then echo "${greenColor}yes${noColor}"; else echo "${redColor}no${noColor}"; fi)"
         echo -e "  ${dimColor}artifacts: $ciArtifacts${noColor}"

@@ -1,8 +1,8 @@
 import AppKit
+import CatnapCore
 import Combine
 import CoreGraphics
 import Foundation
-import ICHRCore
 
 /// The timer's phase, as far as the rest of the app is concerned.
 typealias TimerState = SessionPhase
@@ -12,7 +12,7 @@ typealias PauseReason = PauseCause
 /// Drives `SessionState` and performs the effects it asks for.
 ///
 /// All of the *decisions* — when a lock pauses, when a meeting eats a break,
-/// whether resuming continues or restarts — live in `ICHRCore.SessionState`,
+/// whether resuming continues or restarts — live in `CatnapCore.SessionState`,
 /// where they can be tested without a screen. What is left here is the part
 /// that genuinely needs AppKit: the ticking clock, the system notifications,
 /// the overlay panels, the sounds and the log.

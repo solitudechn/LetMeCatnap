@@ -2,13 +2,13 @@
 import PackageDescription
 
 let package = Package(
-    name: "iCanHazRepose",
+    name: "LetMeCatnap",
     platforms: [
         .macOS(.v13)
     ],
     products: [
-        .executable(name: "iCanHazRepose", targets: ["iCanHazRepose"]),
-        .library(name: "ICHRCore", targets: ["ICHRCore"]),
+        .executable(name: "LetMeCatnap", targets: ["LetMeCatnap"]),
+        .library(name: "CatnapCore", targets: ["CatnapCore"]),
     ],
     dependencies: [
         // Updates are handled by Sparkle rather than by hand: it is the
@@ -22,21 +22,21 @@ let package = Package(
         // table. Kept free of AppKit/SwiftUI so it can be unit-tested anywhere,
         // including in CI.
         .target(
-            name: "ICHRCore",
+            name: "CatnapCore",
             path: "core"
         ),
         .executableTarget(
-            name: "iCanHazRepose",
+            name: "LetMeCatnap",
             dependencies: [
-                "ICHRCore",
+                "CatnapCore",
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "src"
         ),
         .testTarget(
-            name: "ICHRCoreTests",
-            dependencies: ["ICHRCore"],
-            path: "Tests/ICHRCoreTests"
+            name: "CatnapCoreTests",
+            dependencies: ["CatnapCore"],
+            path: "Tests/CatnapCoreTests"
         ),
     ]
 )

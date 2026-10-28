@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import ICHRCore
+@testable import CatnapCore
 
 final class TimerRulesTests: XCTestCase {
 

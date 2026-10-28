@@ -1,18 +1,18 @@
+import CatnapCore
 import Foundation
-import ICHRCore
 
 /// App logger: console output (debug builds) plus a rotating file log.
 ///
 /// A menu bar app has nowhere to surface errors, so a user who reports "it
 /// stopped working" leaves no trace unless something is persisted. Writes are
-/// serialized on a private queue and the file is rotated to `iCanHazRepose.1.log`
+/// serialized on a private queue and the file is rotated to `LetMeCatnap.1.log`
 /// once it passes `maxFileSize`, so it can never grow without bound.
 enum Log {
     private static let queue = DispatchQueue(label: "\(BundleIdentity.identifier).log")
     private static let maxFileSize = 1_000_000  // ~1 MB, roughly a month of use
-    private static let folderName = "iCanHazRepose"
+    private static let folderName = "LetMeCatnap"
 
-    /// `~/Library/Logs/iCanHazRepose/iCanHazRepose.log`
+    /// `~/Library/Logs/LetMeCatnap/LetMeCatnap.log`
     static var fileURL: URL {
         let base =
             FileManager.default
@@ -23,7 +23,7 @@ enum Log {
             base
             .appendingPathComponent("Logs", isDirectory: true)
             .appendingPathComponent(folderName, isDirectory: true)
-            .appendingPathComponent("iCanHazRepose.log", isDirectory: false)
+            .appendingPathComponent("LetMeCatnap.log", isDirectory: false)
     }
 
     static func info(_ message: String) {
@@ -43,7 +43,7 @@ enum Log {
 
     private static func write(_ level: String, _ message: String) {
         #if DEBUG
-            print("[iCHR] \(message)")
+            print("[Catnap] \(message)")
         #endif
         let stamp = timestamp()
         queue.async {

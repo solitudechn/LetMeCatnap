@@ -1,5 +1,5 @@
 import AppKit
-import ICHRCore
+import CatnapCore
 import SwiftUI
 
 struct BreakOverlayView: View {

@@ -7,16 +7,18 @@ Layout:
 - `src/` — the app (AppKit/SwiftUI): menu bar (`AppDelegate`), overlays
   (`BreakOverlayView`, `CompactBreakOverlayView`, `OverlayManager`), the timer's AppKit half
   (`TimerManager`), meeting detection, the About window, the Sparkle wrapper (`Updater`).
-- `core/` — the `ICHRCore` library: pure Foundation only. `TimerRules` (durations, thresholds),
+- `core/` — the `CatnapCore` library: pure Foundation only. `TimerRules` (durations, thresholds),
   `SessionState` (the timer state machine), `Settings` (the single source of truth for every
   preference, with clamping and persistence), `PauseTrigger`, `BundleIdentity`, and the
   localization (`L10n` + `StringTable`). Keeping it free of AppKit is what makes it
   unit-testable without a GUI.
-- `Tests/ICHRCoreTests/` — XCTest for `core/` (timing rules, the session state machine,
+- `Tests/CatnapCoreTests/` — XCTest for `core/` (timing rules, the session state machine,
   settings, string table).
 - `scripts/check-l10n.py` — fails when a `LocKey` has no entry, when a visible string bypasses
   `L10n`, or when a break tip lost its translation.
 - `scripts/verify.sh` — format lint + localization + unit tests + `bash -n build.sh`.
+- `scripts/make-icon.swift` — draws `res/main.icns`, `assets/icon.png` and the DMG backgrounds
+  from `res/icon-source.jpg`. Run it instead of editing the `.icns` by hand.
 - `build.sh` — modes: `dev` (debug, launches), `ci` (universal release artifacts, no upload),
   `dev-release`, `release`. It also embeds `Sparkle.framework` and fixes the rpath.
 - `.github/workflows/` — `ci.yml` on every push/PR, `release.yml` on a `v*` tag.
@@ -25,12 +27,12 @@ Layout:
   every review round ends up arguing against itself.
 
 Verify before calling anything done:
-- `./scripts/verify.sh` — the whole gate (add `ICHR_SWIFT_FLAGS=--disable-sandbox` when
+- `./scripts/verify.sh` — the whole gate (add `CATNAP_SWIFT_FLAGS=--disable-sandbox` when
   SwiftPM's manifest sandbox cannot run, e.g. inside another sandbox).
 - `./build.sh ci` — universal release bundle, does not launch or upload. Needs a full Xcode;
   `build.sh` picks the newest `/Applications/Xcode*.app` when `xcode-select` still points at
   Command Line Tools (otherwise the SwiftUI macros cannot be expanded).
-- Launch `dist/iCanHazRepose.app` and check `~/Library/Logs/iCanHazRepose/iCanHazRepose.log`
+- Launch `dist/LetMeCatnap.app` and check `~/Library/Logs/LetMeCatnap/LetMeCatnap.log`
   after packaging changes — a missing `Sparkle.framework` or rpath shows up there immediately.
   This is also the **only** check that covers `TimerManager.perform(_:)`: the effect → window /
   sound / log mapping has no unit test (the state machine does). Change it, then run a real
@@ -42,13 +44,13 @@ Rules of thumb:
 - Every user-visible string is a `LocKey` case plus an entry in `core/StringTable.swift`;
   never build UI text from a literal. `check-l10n.py` and `StringTableTests` enforce it.
 - Updates belong to Sparkle. Do not reintroduce a hand-written downloader: the release
-  contract is `appcast.xml` (signed with `SPARKLE_ED_PRIVATE_KEY`) + `iCHR.zip` + the Ed25519
+  contract is `appcast.xml` (signed with `SPARKLE_ED_PRIVATE_KEY`) + `LetMeCatnap.zip` + the Ed25519
   public key in `Info.plist`. See `docs/releasing.md`.
 - Break reminders must never trap the user: Escape always dismisses a break, and the
   "Show Skip Button" preference only controls the visible button — never make a break
   unskippable in any other way, and never let a full-screen overlay swallow clicks
   without a way out.
-- Timer state lives in `ICHRCore.SessionState`, not in `TimerManager`. Every transition takes
+- Timer state lives in `CatnapCore.SessionState`, not in `TimerManager`. Every transition takes
   the current time as a parameter and returns `[SessionEffect]`; `TimerManager` owns the clock,
   the system notifications, the overlays, the sounds and the log. Adding a rule to
   `TimerManager` instead is how this project once ended up with two copies of
@@ -60,7 +62,13 @@ Rules of thumb:
   written without a matching call.
 - The bundle identifier has exactly one source: `Info.plist`. `build.sh` reads it for the
   ad-hoc signing requirement, `core/BundleIdentity.swift` mirrors it, and
-  `BundleIdentityTests` fails if the two drift apart.
+  `BundleIdentityTests` fails if the two drift apart. `legacyIdentifiers` in the same file is
+  **append-only** — drop an entry and the settings of everyone who installed that build vanish
+  on upgrade.
+- The app name is `LetMeCatnap`; the GitHub repository is still `solitudechn/iCanHazRepose`.
+  That is deliberate (renaming a repo buys nothing for users), so paths in the README and in
+  `Info.plist`'s `SUFeedURL` point at the old slug. If the repo is ever renamed, change
+  `BundleIdentity.repository` and `SUFeedURL` together — a test keeps them in sync.
 - Style is enforced by `.swift-format` (4 spaces, 110 columns). Run
   `swift format --in-place --recursive src core Tests` instead of hand-aligning.
 

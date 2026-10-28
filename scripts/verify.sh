@@ -6,7 +6,7 @@
 #
 #   ./scripts/verify.sh
 #
-# Set ICHR_SWIFT_FLAGS=--disable-sandbox when SwiftPM's manifest sandbox cannot
+# Set CATNAP_SWIFT_FLAGS=--disable-sandbox when SwiftPM's manifest sandbox cannot
 # run in your environment (it fails with "sandbox_apply: Operation not permitted"
 # inside nested sandboxes).
 
@@ -23,7 +23,7 @@ if [ -z "${DEVELOPER_DIR:-}" ]; then
     fi
 fi
 
-swiftExtra="${ICHR_SWIFT_FLAGS:-}"
+swiftExtra="${CATNAP_SWIFT_FLAGS:-}"
 
 echo "==> swift format lint"
 swift format lint --recursive --strict src core Tests
@@ -32,7 +32,7 @@ echo "==> localization"
 python3 scripts/check-l10n.py
 
 echo "==> unit tests"
-swift test --filter ICHRCoreTests $swiftExtra
+swift test --filter CatnapCoreTests $swiftExtra
 
 echo "==> shell syntax"
 bash -n build.sh

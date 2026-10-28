@@ -1,6 +1,6 @@
 import AppKit
 import Carbon
-import ICHRCore
+import CatnapCore
 import SwiftUI
 
 private class KeyablePanel: NSPanel {

@@ -5,17 +5,17 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleExecutable</key>
-	<string>iCanHazRepose</string>
+	<string>LetMeCatnap</string>
 	<key>CFBundleIconFile</key>
 	<string>main.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>io.github.solitudechn.icanhazrepose</string>
+	<string>io.github.solitudechn.letmecatnap</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>iCanHazRepose</string>
+	<string>LetMeCatnap</string>
 	<key>CFBundleDisplayName</key>
-	<string>iCanHazRepose</string>
+	<string>LetMeCatnap</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleVersion</key>
@@ -25,7 +25,7 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>MIT License. Originally by Fikri Karim, then Ivan "deseven" Novohatski. Simplified Chinese localization by solitudechn.</string>
+	<string>MIT License. Based on iCanHazRepose by Ivan "deseven" Novohatski, itself based on repose by Fikri Karim. LetMeCatnap adds an English / Simplified Chinese UI and behaviour changes, by solitudechn.</string>
 	<key>CSResourcesFileMapped</key>
 	<true/>
 	<key>NSHighResolutionCapable</key>

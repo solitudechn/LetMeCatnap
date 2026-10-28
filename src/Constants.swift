@@ -2,7 +2,7 @@ import Foundation
 
 /// Central place for app-wide constants.
 enum AppConstants {
-    static let appName = "iCanHazRepose"
+    static let appName = "LetMeCatnap"
 
     // MARK: - URLs
     //

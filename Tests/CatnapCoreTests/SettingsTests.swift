@@ -1,7 +1,7 @@
 import Combine
 import XCTest
 
-@testable import ICHRCore
+@testable import CatnapCore
 
 final class SettingsTests: XCTestCase {
     private var suiteName = ""
@@ -9,7 +9,7 @@ final class SettingsTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        suiteName = "ICHRCoreTests." + UUID().uuidString
+        suiteName = "CatnapCoreTests." + UUID().uuidString
         defaults = UserDefaults(suiteName: suiteName)
         defaults.removePersistentDomain(forName: suiteName)
     }
@@ -139,7 +139,7 @@ final class SettingsTests: XCTestCase {
 
     @MainActor
     func testPreferencesMigrateFromLegacyBundleIdentifier() {
-        let legacySuite = "ICHRCoreTests.legacy." + UUID().uuidString
+        let legacySuite = "CatnapCoreTests.legacy." + UUID().uuidString
         let legacy = UserDefaults(suiteName: legacySuite)!
         legacy.removePersistentDomain(forName: legacySuite)
         defer { legacy.removePersistentDomain(forName: legacySuite) }

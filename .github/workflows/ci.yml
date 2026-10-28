@@ -42,7 +42,7 @@ jobs:
       - name: Run core tests
         # Pure-logic tests for timing rules and settings; they need XCTest,
         # which only ships with a full Xcode (selected above).
-        run: swift test --filter ICHRCoreTests
+        run: swift test --filter CatnapCoreTests
 
       - name: Check formatting
         # Style is enforced rather than hand-maintained; config in .swift-format.
@@ -64,7 +64,7 @@ jobs:
 
       - name: Build
         # `ci` mode = release config, universal binary, ad-hoc signed,
-        # iCHR.zip + iCHR.dmg in ./dist, nothing is uploaded or launched.
+        # LetMeCatnap.zip + LetMeCatnap.dmg in ./dist, nothing is uploaded or launched.
         # `tee` keeps the whole console output while build.sh also writes
         # build.log for the failure summary below.
         run: |
@@ -98,19 +98,19 @@ jobs:
 
       - name: Verify artifacts
         run: |
-          test -f dist/iCHR.zip || { echo "::error::dist/iCHR.zip missing"; exit 1; }
-          unzip -l dist/iCHR.zip | head -20
+          test -f dist/LetMeCatnap.zip || { echo "::error::dist/LetMeCatnap.zip missing"; exit 1; }
+          unzip -l dist/LetMeCatnap.zip | head -20
           /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" \
-            "dist/iCanHazRepose.app/Contents/Info.plist"
-          lipo -archs "dist/iCanHazRepose.app/Contents/MacOS/iCanHazRepose"
-          codesign --verify --deep --strict --verbose=2 dist/iCanHazRepose.app
+            "dist/LetMeCatnap.app/Contents/Info.plist"
+          lipo -archs "dist/LetMeCatnap.app/Contents/MacOS/LetMeCatnap"
+          codesign --verify --deep --strict --verbose=2 dist/LetMeCatnap.app
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: iCanHazRepose-${{ github.sha }}
+          name: LetMeCatnap-${{ github.sha }}
           path: |
-            dist/iCHR.zip
-            dist/iCHR.dmg
+            dist/LetMeCatnap.zip
+            dist/LetMeCatnap.dmg
           if-no-files-found: warn
           retention-days: 14

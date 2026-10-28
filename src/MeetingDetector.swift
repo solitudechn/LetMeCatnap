@@ -1,7 +1,7 @@
+import CatnapCore
 import CoreAudio
 import CoreMediaIO
 import Foundation
-import ICHRCore
 
 class MeetingDetector: ObservableObject {
     @Published var isInMeeting: Bool = false

@@ -1,5 +1,5 @@
+import CatnapCore
 import Cocoa
-import ICHRCore
 
 // MARK: - Link Button
 
