@@ -77,6 +77,20 @@ xattr -dr com.apple.quarantine /Applications/iCanHazRepose.app
 启动时从 `wtf.d7.icanhazrepose` 迁移一次（见 `Settings.migratePreferences`），
 但 ad-hoc 签名下「应用身份」也会变，`SMAppService`（开机启动注册）需要用户重新打开一次。
 
+### v1.1.0 是一次性手动升级
+
+v1.0.x 里的自研更新器会校验「新包的代码签名要求必须和当前一致」。1.1.0 的
+identifier 变了（`wtf.d7.icanhazrepose` → `io.github.solitudechn.icanhazrepose`），
+所以老用户点「更新」会收到「下载的应用由不同的签名身份签发」并中止——
+这是设计如此，不是 bug。
+
+发布 v1.1.0 时请在 release 正文最前面加一句：
+
+> **从 1.0.x 升级需要手动安装一次**（bundle id 已更改，旧版更新器会拒绝替换）。
+> 下载 `iCHR.dmg` 覆盖安装即可，设置会自动迁移；此后恢复自动更新。
+
+从 1.1.0 起更新由 Sparkle 负责，不再有这个问题。
+
 ## 五、排错
 
 | 现象 | 原因 |
