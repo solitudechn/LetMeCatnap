@@ -411,11 +411,20 @@ public struct SessionState: Equatable {
             }
         }
 
-        if phase == .working, new.workSeconds != previous.workSeconds {
-            // Keep the remaining time but move its deadline to match, otherwise
-            // the change would only take effect after the next full session.
-            if remaining > new.workSeconds { remaining = new.workSeconds }
-            workDeadline = TimerRules.deadline(from: now, seconds: remaining)
+        if new.workSeconds != previous.workSeconds {
+            if phase == .working {
+                // Keep the remaining time but move its deadline to match, otherwise
+                // the change would only take effect after the next full session.
+                if remaining > new.workSeconds { remaining = new.workSeconds }
+                workDeadline = TimerRules.deadline(from: now, seconds: remaining)
+            } else if phase == .paused {
+                // A paused session has banked its remaining time instead. The
+                // cap has to apply there too: without it, pausing at 18:20 of
+                // a 20 minute session and then shortening the interval to
+                // 5 minutes would resume an 18 minute session — the free time
+                // the running case explicitly refuses to hand out.
+                if banked > new.workSeconds { banked = new.workSeconds }
+            }
         }
 
         if phase == .working {
@@ -431,7 +440,9 @@ public struct SessionState: Equatable {
         now: Date,
         resetImminent: Bool = true
     ) -> [SessionEffect] {
-        let duration = max(0, seconds)
+        // Never longer than one full session: a resumed pause hands over its
+        // banked time, and that time must not exceed the configured interval.
+        let duration = min(max(0, seconds), config.workSeconds)
         isFinishingBreak = false
         isLongBreak = false
         activeBreakTotal = 0

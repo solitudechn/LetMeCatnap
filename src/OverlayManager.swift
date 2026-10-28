@@ -21,11 +21,25 @@ class OverlayManager {
 
     // MARK: - Full overlay (all screens)
 
+    /// The screen the break content is drawn on.
+    ///
+    /// `NSScreen.main` is the screen that holds the keyboard focus. A menu bar
+    /// app has no window of its own, so that value can be `nil` — the frontmost
+    /// app may have no key window either. It used to be used directly, and with
+    /// `nil` *no* panel was flagged as primary, which meant the overlay showed
+    /// as a black screen with no message and no countdown on it. Falling back
+    /// to the first screen keeps the promise that a break always says
+    /// something.
+    private static var primaryScreen: NSScreen? {
+        NSScreen.main ?? NSScreen.screens.first
+    }
+
     func showBreakOverlay(timerManager: TimerManager) {
         dismissOverlay()
 
+        let primary = OverlayManager.primaryScreen
         for screen in NSScreen.screens {
-            let isPrimary = screen == NSScreen.main
+            let isPrimary = screen == primary
             let view = BreakOverlayView(timerManager: timerManager, isPrimary: isPrimary)
 
             let panel = KeyablePanel(
@@ -59,7 +73,7 @@ class OverlayManager {
     func showCompactBreakOverlay(timerManager: TimerManager) {
         dismissOverlay()
 
-        guard let screen = NSScreen.main else { return }
+        guard let screen = OverlayManager.primaryScreen else { return }
 
         let panelWidth: CGFloat = 360
         let panelHeight: CGFloat = 420

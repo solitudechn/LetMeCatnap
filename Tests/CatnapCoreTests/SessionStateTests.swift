@@ -332,6 +332,41 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(state.remaining, 600, "a longer limit must not hand out free time")
     }
 
+    /// The same rule has to hold while the timer is paused, where the
+    /// remaining time is banked instead of counted down.
+    func testShorteningTheIntervalAlsoCapsTheBankedTime() {
+        var state = makeState(workSeconds: 1200)
+        _ = state.pauseManually(now: start.addingTimeInterval(100))
+        XCTAssertEqual(state.banked, 1100)
+
+        var shorter = state.config
+        shorter.workSeconds = 600
+        _ = state.configChanged(shorter, now: start.addingTimeInterval(120))
+        XCTAssertEqual(state.banked, 600, "the banked time no longer fits the new interval")
+
+        _ = state.resumeManually(now: start.addingTimeInterval(130))
+        XCTAssertEqual(
+            state.remaining,
+            600,
+            "resuming must not hand out more time than the configured interval"
+        )
+    }
+
+    /// Lengthening the interval keeps the time that was already earned —
+    /// a longer limit is not a gift.
+    func testLengtheningTheIntervalKeepsTheBankedTime() {
+        var state = makeState(workSeconds: 1200)
+        _ = state.pauseManually(now: start.addingTimeInterval(100))
+
+        var longer = state.config
+        longer.workSeconds = 3600
+        _ = state.configChanged(longer, now: start.addingTimeInterval(120))
+        XCTAssertEqual(state.banked, 1100)
+
+        _ = state.resumeManually(now: start.addingTimeInterval(130))
+        XCTAssertEqual(state.remaining, 1100)
+    }
+
     // MARK: - Meetings
 
     func testMeetingInterruptsABreak() {
