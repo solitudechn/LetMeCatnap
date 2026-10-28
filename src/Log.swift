@@ -41,21 +41,25 @@ enum Log {
 
     // MARK: - Private
 
+    /// Cached formatter. Allocating a `DateFormatter` costs about a millisecond,
+    /// which is silly to pay per line, so it is created once and only ever used
+    /// on `queue` — which serializes every write, satisfying the formatter's
+    /// non-thread-safety for free.
+    private static let stampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        return formatter
+    }()
+
     private static func write(_ level: String, _ message: String) {
         #if DEBUG
             print("[Catnap] \(message)")
         #endif
-        let stamp = timestamp()
         queue.async {
+            let stamp = stampFormatter.string(from: Date())
             append("\(stamp) [\(level)] \(message)\n")
         }
-    }
-
-    private static func timestamp() -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-        return formatter.string(from: Date())
     }
 
     /// Runs on `queue` only.

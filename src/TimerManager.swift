@@ -256,7 +256,15 @@ class TimerManager: ObservableObject {
     private func apply(
         _ transition: (inout SessionState) -> [SessionEffect]
     ) -> [SessionEffect] {
-        let effects = transition(&session)
+        // Write back only when something actually changed. An inout call always
+        // writes back, and `@Published` fires `objectWillChange` on any write —
+        // without this guard, every no-op second (the whole paused phase, for
+        // instance) made every observing view re-diff itself for nothing.
+        var next = session
+        let effects = transition(&next)
+        if next != session {
+            session = next
+        }
         for effect in effects {
             perform(effect)
         }
@@ -337,8 +345,12 @@ class TimerManager: ObservableObject {
     // MARK: - Tick
 
     private func startTicking() {
+        // Keeps the one-second tick honest under App Nap without pinning the
+        // machine awake: plain `.userInitiated` would also disable idle system
+        // sleep, which is the opposite of what the lock/idle pause flow assumes
+        // — a machine nobody is touching ought to be allowed to sleep.
         activity = ProcessInfo.processInfo.beginActivity(
-            options: .userInitiated,
+            options: .userInitiatedAllowingIdleSystemSleep,
             reason: "Break timer running"
         )
 

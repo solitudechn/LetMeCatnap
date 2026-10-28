@@ -108,8 +108,16 @@ if [ -n "${CATNAP_SIGNING_IDENTITY:-}" ] && [ "$mode" != "dev" ]; then
     can_sign=true
     if [ -n "${CATNAP_NOTARY_PROFILE:-}" ]; then
         can_notarize=true
-    elif [ -n "${CATNAP_APPLE_ID:-}" ] && [ -n "${CATNAP_TEAM_ID:-}" ] && [ -n "${CATNAP_APP_PASSWORD:-}" ]; then
-        can_notarize=true
+    elif [ -n "${CATNAP_APPLE_ID:-}" ] || [ -n "${CATNAP_APP_PASSWORD:-}" ]; then
+        # The Apple-ID/app-password submission used to be supported here, but
+        # `notarytool submit --password` puts the secret in the process list,
+        # where any local user can read it with `ps`. Notarization now requires
+        # a keychain profile only.
+        echo "notarization skipped: CATNAP_APPLE_ID/CATNAP_APP_PASSWORD are no longer accepted —" \
+            "notarytool would expose the password in the process list." > "$TTY"
+        echo "  Run once:  xcrun notarytool store-credentials letmecatnap \\" > "$TTY"
+        echo "               --apple-id <id> --team-id <team> --password <app-password>" > "$TTY"
+        echo "  Then set:  CATNAP_NOTARY_PROFILE=letmecatnap" > "$TTY"
     fi
 fi
 
@@ -408,15 +416,9 @@ do_sign_dmg() {
 
 do_notarize() {
     local file="$1"
-    if [ -n "${CATNAP_NOTARY_PROFILE:-}" ]; then
-        xcrun notarytool submit "$file" --keychain-profile "$CATNAP_NOTARY_PROFILE" --wait
-    else
-        xcrun notarytool submit "$file" \
-            --apple-id "$CATNAP_APPLE_ID" \
-            --team-id "$CATNAP_TEAM_ID" \
-            --password "$CATNAP_APP_PASSWORD" \
-            --wait
-    fi
+    # Keychain profile only: `--password` on the command line would leak the
+    # app-specific password into the process list.
+    xcrun notarytool submit "$file" --keychain-profile "$CATNAP_NOTARY_PROFILE" --wait
 }
 
 do_staple_app() {
