@@ -28,9 +28,11 @@
 <br/>
 
 > **This is a fork.** It adds an English / 简体中文 UI on top of
-> [deseven/iCanHazRepose](https://github.com/deseven/iCanHazRepose) and ships its own
-> downloads and auto-updates. For anything that is not about the localization,
-> please use the upstream repository.
+> [deseven/iCanHazRepose](https://github.com/deseven/iCanHazRepose), ships under
+> its own bundle identifier (`io.github.solitudechn.icanhazrepose`) and its own
+> signed update feed, so it installs next to the original instead of replacing
+> it. For anything that is not about the localization, please use the upstream
+> repository.
 
 <br/>
 
@@ -107,17 +109,40 @@ Xcode, `build.sh` picks the newest `/Applications/Xcode*.app` by itself.
 same artifacts as a release (universal binary, `iCHR.zip`, `iCHR.dmg`) without
 uploading or launching anything.
 
-## Tests
+## Updates
 
-Timing rules and settings live in a separate `ICHRCore` module so they can be
-tested without AppKit:
+Updates are handled by [Sparkle 2](https://sparkle-project.org), not by
+hand-rolled code:
+
+- the feed is `https://github.com/solitudechn/iCanHazRepose/releases/latest/download/appcast.xml`,
+  so publishing a release is the only step needed to ship an update;
+- every release archive is signed with an Ed25519 key; the public half lives in
+  `Info.plist` as `SUPublicEDKey`, and Sparkle refuses anything that does not
+  match;
+- Sparkle asks for an administrator password when `/Applications` is not
+  writable, instead of failing after the app has already quit.
+
+Checks run once a day in the background and on demand from **Check for
+Updates…** in the menu. Skip a version and Sparkle stops offering it.
+
+## Tests and checks
+
+Timing rules, settings and the string table live in the `ICHRCore` module so they
+can be tested without AppKit:
+
+```
+./scripts/verify.sh                 # format lint + copy check + unit tests
+```
+
+Individually:
 
 ```
 swift test --filter ICHRCoreTests   # needs a full Xcode (XCTest)
-python3 scripts/check-l10n.py       # both languages complete, no stray literals
+python3 scripts/check-l10n.py       # every key translated, no stray literals
+swift format lint -r src core Tests # style, config in .swift-format
 ```
 
-Both run in CI on every push.
+All of them run in CI on every push.
 
 ## Localization / 界面语言
 
@@ -125,30 +150,14 @@ The UI ships with **English** and **简体中文** and follows your system langu
 
 界面默认跟随系统语言（英文 / 简体中文），也可随时在菜单栏 **语言** 里手动切换，无需重启应用。
 
-All translatable strings live in [`src/L10n.swift`](src/L10n.swift).
+Every user-visible string is a case of `LocKey` in
+[`core/L10n.swift`](core/L10n.swift), with both translations in
+[`core/StringTable.swift`](core/StringTable.swift). A missing key is a compile
+error, and `StringTableTests` fails if a translation is empty, lost its `%@`/`%ld`
+placeholder, or kept the English side untranslated.
 
-## Releasing
+简体中文界面由 [solitudechn](https://github.com/solitudechn) 汉化并维护。
 
-```sh
-git tag v1.0.4 && git push origin v1.0.4
-```
-
-The `Release` workflow builds a universal `.app`, zips it as `iCHR.zip`, creates
-`iCHR.dmg`, stamps the version from the tag into `Info.plist`, and publishes a
-GitHub Release titled `iCanHazRepose 1.0.4`.
-
-Two details matter for the in-app updater — do not change them:
-
-- the release title must contain `iCanHazRepose x.y.z` (or `iCHR x.y.z`);
-- the zip asset must be named exactly `iCHR.zip`.
-
-Add `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID`
-and `NOTARY_APP_PASSWORD` as repository secrets to get a signed + notarized
-build; without them the artifacts are ad-hoc signed.
-
-## Help & Support
-
-- [File an issue](https://github.com/solitudechn/iCanHazRepose/issues/new) for bugs, suggestions, or questions about this fork
-- [Upstream issues](https://github.com/deseven/iCanHazRepose/issues) for the app itself
-- Discord: https://discord.gg/YE9KyTXRPt
-- Reddit: https://www.reddit.com/r/iCanHazApps
+One exception: Sparkle's own update dialogs follow the *system* language rather
+than the in-app **Language** switch — they come from inside the framework, not
+from `StringTable`.

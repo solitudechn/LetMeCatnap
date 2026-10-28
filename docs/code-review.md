@@ -338,3 +338,26 @@ x86_64 会覆盖先跑的 arm64——`lipo` 直接报 "no eligible inputs"。
 - 安装更新失败无提示；公证顺序倒置；zip 符号链接未校验；
 - 两张界面截图过期；`.roorules` / `.env.example` 未随项目演进更新；
 - 无 CI lint、无辅助功能标签。
+
+---
+
+## 第十轮：更新器换代、bundle id、L10n 框架化（2026-10-28）
+
+这一轮不是「再查一遍」，而是按用户决定做了三处架构变更，因此上面所有提到
+`UpdateManager` / `UpdateDialogViewController` / `L10n.t("en", "zh")` 的段落都成了历史。
+
+1. **更新器换成 Sparkle 2**（`src/Updater.swift`，约 100 行包装）。自研的下载 / 解压 /
+   验签 / 替换 bundle 代码全部删除，顺带消掉了「安装失败无提示」「管道死锁」
+   「zip 符号链接未校验」三条问题。发布的硬约束随之改变：不再是「标题含
+   `iCanHazRepose x.y.z` + 资产名 `iCHR.zip`」，而是「`appcast.xml` 必须签名、
+   且与 `Info.plist` 的 `SUPublicEDKey` 配对」，详见 `docs/releasing.md`。
+2. **bundle id 改为 `io.github.solitudechn.icanhazrepose`**。可与原版共存；
+   `Settings.migratePreferences` 负责从旧 domain 一次性搬迁偏好，有三处 id 需要同步
+   （`Info.plist`、`core/BundleIdentity.swift`、`build.sh` 的 `ident`）。
+3. **`L10n` 框架化**：字符串表迁进 `ICHRCore`，键是 `LocKey` 枚举（编译期校验），
+   值是 `Translation`（中英成对），参数走 `%ld` / `%@` 格式串。新增
+   `StringTableTests` 检查空串、漏翻、占位符数量；`check-l10n.py` 改为结构校验 +
+   硬编码扫描。
+
+同时补了 `.swift-format` + CI lint、辅助功能标签、`scripts/verify.sh`、`.roorules` 重写，
+以及关于窗口里的汉化署名。界面截图仍未重截（本机进程无屏幕录制权限）。

@@ -1,29 +1,48 @@
 This project is a macOS menu bar app that prompts the user to rest their eyes every X minutes.
-It targets macOS 13+ and is built with Swift Package Manager. The UI is code-only (SwiftUI views
-plus direct Cocoa calls), no XIBs.
+It targets macOS 13+ and is built with Swift Package Manager (tools-version 5.10, Swift 6
+toolchain, Swift 5 language mode). The UI is code-only (SwiftUI views plus direct Cocoa calls),
+no XIBs, no Xcode project — `build.sh` assembles the `.app` bundle by hand.
 
 Layout:
-- `src/` — the app (AppKit/SwiftUI): menu bar, overlays, updater, localization (`L10n.swift`).
-- `core/` — the `ICHRCore` library: pure Foundation only (`TimerRules`, `Settings`, `PauseTrigger`).
+- `src/` — the app (AppKit/SwiftUI): menu bar (`AppDelegate`), overlays
+  (`BreakOverlayView`, `CompactBreakOverlayView`, `OverlayManager`), timer state machine
+  (`TimerManager`), meeting detection, the About window, the Sparkle wrapper (`Updater`).
+- `core/` — the `ICHRCore` library: pure Foundation only. `TimerRules` (durations, thresholds),
+  `Settings` (the single source of truth for every preference, with clamping and persistence),
+  `PauseTrigger`, `BundleIdentity`, and the localization (`L10n` + `StringTable`).
   Keeping it free of AppKit is what makes it unit-testable without a GUI.
-- `Tests/ICHRCoreTests/` — XCTest for `core/`.
-- `scripts/check-l10n.py` — fails when a translation is missing or a UI string bypasses `L10n`.
-- `build.sh` — assembles the `.app` bundle, the zip and the DMG.
+- `Tests/ICHRCoreTests/` — XCTest for `core/` (timing rules, settings, string table).
+- `scripts/check-l10n.py` — fails when a `LocKey` has no entry, when a visible string bypasses
+  `L10n`, or when a break tip lost its translation.
+- `scripts/verify.sh` — format lint + localization + unit tests + `bash -n build.sh`.
+- `build.sh` — modes: `dev` (debug, launches), `ci` (universal release artifacts, no upload),
+  `dev-release`, `release`. It also embeds `Sparkle.framework` and fixes the rpath.
+- `.github/workflows/` — `ci.yml` on every push/PR, `release.yml` on a `v*` tag.
+- `docs/` — audit reports, the rolling code review log, and `releasing.md`.
 
 Verify before calling anything done:
-- `./build.sh ci`  — universal release bundle, does not launch or upload. Needs a full Xcode;
+- `./scripts/verify.sh` — the whole gate (add `ICHR_SWIFT_FLAGS=--disable-sandbox` when
+  SwiftPM's manifest sandbox cannot run, e.g. inside another sandbox).
+- `./build.sh ci` — universal release bundle, does not launch or upload. Needs a full Xcode;
   `build.sh` picks the newest `/Applications/Xcode*.app` when `xcode-select` still points at
   Command Line Tools (otherwise the SwiftUI macros cannot be expanded).
-- `swift test` — runs the core tests.
-- `python3 scripts/check-l10n.py`
+- Launch `dist/iCanHazRepose.app` and check `~/Library/Logs/iCanHazRepose/iCanHazRepose.log`
+  after packaging changes — a missing `Sparkle.framework` or rpath shows up there immediately.
 
 Rules of thumb:
-- Every user-visible string goes through `L10n.t("English", "简体中文")`; the script above enforces it.
-- The updater's contract is fixed: the release title must contain `iCanHazRepose x.y.z` and the
-  zip asset must be named exactly `iCHR.zip`.
-- Break reminders must never trap the user: skipping a break is always allowed.
+- Every user-visible string is a `LocKey` case plus an entry in `core/StringTable.swift`;
+  never build UI text from a literal. `check-l10n.py` and `StringTableTests` enforce it.
+- Updates belong to Sparkle. Do not reintroduce a hand-written downloader: the release
+  contract is `appcast.xml` (signed with `SPARKLE_ED_PRIVATE_KEY`) + `iCHR.zip` + the Ed25519
+  public key in `Info.plist`. See `docs/releasing.md`.
+- Break reminders must never trap the user: skipping a break is always allowed, and Escape
+  always closes the full-screen overlay when "Allow Skip Break" is on.
 - Timer state lives in `TimerManager`; anything that pauses or resumes it should go through its
   helpers rather than mutating `state` from the outside.
+- The three bundle identifiers must stay in sync: `Info.plist`, `core/BundleIdentity.swift`
+  and the `ident` variable in `build.sh`.
+- Style is enforced by `.swift-format` (4 spaces, 110 columns). Run
+  `swift format --in-place --recursive src core Tests` instead of hand-aligning.
 
 Don't overthink. Ask if something is unclear. If you hit a difficult problem, explain it first
 and ask the user before guessing.
