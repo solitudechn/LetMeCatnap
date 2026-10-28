@@ -21,7 +21,9 @@ public final class Settings: ObservableObject {
         public static let workMinutes = "workDurationMinutes"
         public static let breakSeconds = "breakDurationSeconds"
         public static let pauseDuringMeetings = "pauseDuringMeetings"
-        public static let pauseWhenLocked = "pauseWhenLocked"
+        public static let pauseTrigger = "pauseTrigger"
+        /// Legacy boolean, read once for migration.
+        public static let legacyPauseWhenLocked = "pauseWhenLocked"
         public static let allowSkipBreak = "allowSkipBreak"
         public static let progressiveReminders = "progressiveReminders"
         public static let muteSounds = "muteSounds"
@@ -30,8 +32,6 @@ public final class Settings: ObservableObject {
         public static let longBreakSeconds = "longBreakSeconds"
         public static let skippedUpdate = "skippedUpdate"
         public static let hasCompletedWelcome = "hasCompletedWelcome"
-        /// Legacy key from the idle-based pause; read once for migration.
-        public static let legacyPauseWhenIdle = "pauseWhenIdle"
     }
 
     /// Factory values, used when a key has never been written.
@@ -41,7 +41,7 @@ public final class Settings: ObservableObject {
         public static let longBreakEvery = 4
         public static let longBreakSeconds = 900
         public static let pauseDuringMeetings = true
-        public static let pauseWhenLocked = true
+        public static let pauseTrigger: PauseTrigger = .lockScreen
         public static let allowSkipBreak = true
         public static let progressiveReminders = true
         public static let muteSounds = false
@@ -59,7 +59,7 @@ public final class Settings: ObservableObject {
     @Published public private(set) var longBreakSeconds: Int
 
     @Published public private(set) var pauseDuringMeetings: Bool
-    @Published public private(set) var pauseWhenLocked: Bool
+    @Published public private(set) var pauseTrigger: PauseTrigger
     @Published public private(set) var allowSkipBreak: Bool
     @Published public private(set) var progressiveReminders: Bool
     @Published public private(set) var muteSounds: Bool
@@ -104,13 +104,19 @@ public final class Settings: ObservableObject {
             defaults, Key.hideMenuBarTimer, fallback: Defaults.hideMenuBarTimer
         )
 
-        // Someone who explicitly turned the old idle pause off should not
-        // suddenly get a lock pause after upgrading: the legacy value becomes
-        // the fallback for the new key.
-        let legacyIdle = Self.optionalBoolean(defaults, Key.legacyPauseWhenIdle)
-        pauseWhenLocked = Self.boolean(
-            defaults, Key.pauseWhenLocked, fallback: legacyIdle ?? Defaults.pauseWhenLocked
-        )
+        // One-time migration from the two booleans that predate `pauseTrigger`:
+        //  - explicitly disabled automatic pausing  -> stay disabled (`.never`)
+        //  - otherwise                             -> `.lockScreen`
+        // Idle pausing, which used to be the default, is deliberately not
+        // restored: it is what made reading look like an absence.
+        if let raw = Self.optionalInteger(defaults, Key.pauseTrigger),
+           let stored = PauseTrigger(rawValue: raw) {
+            pauseTrigger = stored
+        } else if Self.optionalBoolean(defaults, Key.legacyPauseWhenLocked) == false {
+            pauseTrigger = .never
+        } else {
+            pauseTrigger = Defaults.pauseTrigger
+        }
 
         skippedUpdateVersion = defaults.string(forKey: Key.skippedUpdate)
         hasCompletedWelcome = Self.boolean(
@@ -159,8 +165,10 @@ public final class Settings: ObservableObject {
         pauseDuringMeetings = persist(value, Key.pauseDuringMeetings)
     }
 
-    public func setPauseWhenLocked(_ value: Bool) {
-        pauseWhenLocked = persist(value, Key.pauseWhenLocked)
+    public func setPauseTrigger(_ value: PauseTrigger) {
+        guard value != pauseTrigger else { return }
+        pauseTrigger = value
+        defaults.set(value.rawValue, forKey: Key.pauseTrigger)
     }
 
     public func setAllowSkipBreak(_ value: Bool) {
@@ -213,5 +221,9 @@ public final class Settings: ObservableObject {
 
     private static func optionalBoolean(_ defaults: UserDefaults, _ key: String) -> Bool? {
         (defaults.object(forKey: key) as? NSNumber)?.boolValue
+    }
+
+    private static func optionalInteger(_ defaults: UserDefaults, _ key: String) -> Int? {
+        (defaults.object(forKey: key) as? NSNumber)?.intValue
     }
 }

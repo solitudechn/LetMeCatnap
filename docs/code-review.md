@@ -201,8 +201,8 @@ ad-hoc 包若不写这个 DR，DR 会退化成 cdhash，新旧版本必然不匹
 - 删除 `CGEventSource` 空闲轮询：读文档两分钟不动鼠标不再等于"人走了"，
   而锁屏/显示器休眠一定意味着离开。
 - 解锁后开始一个完整工作轮次（锁屏本身就是休息）。
-- 旧设置 `pauseWhenIdle` 只在首次升级时作为默认值读取一次（`Settings` 迁移），
-  之后统一用 `pauseWhenLocked`。
+- 旧设置 `pauseWhenIdle` / `pauseWhenLocked` 只作为一次性迁移来源读取；
+  之后统一用 `pauseTrigger`（见第七轮，已改为可选项）。
 
 ### 2. 休息不再强制，Esc 永远可退出
 - 删除 `isBreakMandatory` 与 `skipBreak` 的拦截；`canSkipBreak` 只看
@@ -237,3 +237,35 @@ ad-hoc 包若不写这个 DR，DR 会退化成 cdhash，新旧版本必然不匹
 - `swift test` 依赖 XCTest，只能在完整 Xcode 下运行；本地用 `swiftc -typecheck`
   与等价的行为脚本验证（33 项状态测试 + 34 项 Core 断言）。
 - 公证顺序问题（见上一节）仍未处理，需在启用签名时一并调整。
+
+---
+
+## 设计改造（第七轮）：暂停时机可选
+
+第六轮把空闲检测换成了锁屏检测，但那是**替用户做的决定**。本轮把它变成设置项，
+默认值仍是锁屏——对「离开就锁屏」的人是最少误判的选择，其他人可以改。
+
+### 实现
+- `ICHRCore.PauseTrigger`（`core/PauseTrigger.swift`）：`lockScreen` / `idle` /
+  `lockScreenOrIdle` / `never`，附 `pausesOnLock` / `pausesOnIdle` 谓词。
+  显示文案留在 App 的 `L10n`，枚举本身不持有 UI 字符串。
+- `Settings`：新键 `pauseTrigger`（存 rawValue）。旧的两个布尔键降级为一次性迁移：
+  显式关过暂停 → `.never`；其余 → `.lockScreen`。**空闲模式不会被自动恢复**，
+  因为它正是让「读文档」被误判为离开的元凶。
+- `TimerManager`：
+  - 新增 `PauseReason.idle`，菜单栏显示「空闲 m:ss」、图标 `moon.zzz`；
+  - `checkIdleStatus()` 每 5 秒随会议检测一起跑，仅在 `pausesOnIdle` 时生效；
+  - 阈值常量化：`TimerRules.idleThresholdSeconds = 300`（5 分钟）、
+    `idleReturnSeconds = 5`（回到键鼠即恢复），不再沿用「60 + 休息时长」；
+  - 锁屏/空闲暂停恢复时都开始完整工作轮次（离开过 = 已经休息过）；
+  - 切换设置时若正因该信号暂停，会立即恢复（`pauseTriggerSettingChanged`）。
+- 菜单：提醒子菜单第一项为「暂停时机 ▸」单选组（4 个勾选项），取代原来的
+  「锁屏时自动暂停」开关。
+- 可测性：锁屏状态与空闲秒数改为可注入的闭包（`screenLockedProvider` /
+  `secondsSinceInputProvider`），无图形会话的机器也能验证这两条路径。
+
+### 验证
+- `swiftc -typecheck`：14 个文件 **0 error / 0 warning**（含两个 SwiftUI 视图）。
+- 状态行为测试 **46 项**全过（新增：空闲阈值前后、恢复、组合触发、
+  非锁屏触发时锁屏不暂停、屏亮但仍锁屏不恢复、切设置解除滞留暂停）。
+- Core 规则/设置断言 + `scripts/check-l10n.py`（78 组双语，79 处引用）通过。

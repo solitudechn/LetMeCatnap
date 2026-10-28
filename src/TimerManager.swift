@@ -14,6 +14,7 @@ enum PauseReason {
     case manual
     case meeting
     case locked
+    case idle
     case breakPending  // Work timer expired during meeting, waiting for meeting to end
 }
 
@@ -66,7 +67,6 @@ class TimerManager: ObservableObject {
     var breakDurationSeconds: Int { settings.shortBreakSeconds }
     var pauseDuringMeetings: Bool { settings.pauseDuringMeetings }
     var muteSounds: Bool { settings.muteSounds }
-    var pauseWhenLocked: Bool { settings.pauseWhenLocked }
     var longBreakEvery: Int { settings.longBreakEvery }
     var longBreakSeconds: Int { settings.longBreakTotalSeconds }
     var progressiveReminders: Bool { settings.progressiveReminders }
@@ -106,6 +106,8 @@ class TimerManager: ObservableObject {
                 return L10n.meetingInProgress
             case .locked:
                 return L10n.locked
+            case .idle:
+                return L10n.idleCountdown(formatTime(secondsBeforePause))
             case .manual:
                 return L10n.pausedCountdown(formatTime(secondsBeforePause))
             }
@@ -121,6 +123,8 @@ class TimerManager: ObservableObject {
             return meetingDetector.meetingSource.map { L10n.breakPending($0) } ?? L10n.inMeetingBreakPending
         case .locked:
             return L10n.pausedLocked
+        case .idle:
+            return L10n.pausedIdle
         case .manual:
             return L10n.paused
         }
@@ -145,7 +149,7 @@ class TimerManager: ObservableObject {
 
         // A Lock Screen or display sleep while the app was still launching
         // should not leave the timer running behind it.
-        if settings.pauseWhenLocked && isScreenLocked() {
+        if settings.pauseTrigger.pausesOnLock && screenLockedProvider() {
             handleScreenLocked()
         }
 
@@ -201,7 +205,11 @@ class TimerManager: ObservableObject {
         }
     }
 
-    private func isScreenLocked() -> Bool {
+    /// Whether the session is locked. Overridable so tests do not depend on
+    /// the machine's real lock state.
+    var screenLockedProvider: () -> Bool = { TimerManager.sessionIsLocked() }
+
+    static func sessionIsLocked() -> Bool {
         guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else {
             return false
         }
@@ -209,7 +217,7 @@ class TimerManager: ObservableObject {
     }
 
     private func handleScreenLocked() {
-        guard settings.pauseWhenLocked, state == .working else { return }
+        guard settings.pauseTrigger.pausesOnLock, state == .working else { return }
         updateWorkingCountdown()
         secondsBeforePause = remainingSeconds
         workDeadline = nil
@@ -221,7 +229,51 @@ class TimerManager: ObservableObject {
 
     private func handleScreenUnlocked() {
         guard state == .paused, pauseReason == .locked else { return }
+        // Display wake fires before the unlock in most cases — stay paused
+        // until the session really is unlocked.
+        if settings.pauseTrigger.pausesOnLock && screenLockedProvider() { return }
         Log.info("Screen unlocked — starting a full work session")
+        resumeFromAutomaticPause()
+    }
+
+    // MARK: - Idle (opt-in alternative to the lock screen)
+
+    /// Seconds since the last keyboard or mouse event. Overridable so the idle
+    /// rules can be verified without waiting for real input.
+    var secondsSinceInputProvider: () -> TimeInterval = {
+        // `~0` is the documented way to ask for "any event type" here; the
+        // initializer only fails for values that fit in the raw type, so the
+        // fallback is unreachable.
+        let anyEvent = CGEventType(rawValue: ~0) ?? .null
+        return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyEvent)
+    }
+
+    private func checkIdleStatus() {
+        guard settings.pauseTrigger.pausesOnIdle else { return }
+        let idle = secondsSinceInputProvider()
+
+        if TimerRules.shouldPauseForIdle(
+            secondsSinceInput: idle,
+            trigger: settings.pauseTrigger,
+            isWorking: state == .working
+        ) {
+            updateWorkingCountdown()
+            secondsBeforePause = remainingSeconds
+            workDeadline = nil
+            isBreakImminent = false
+            state = .paused
+            pauseReason = .idle
+            Log.info("Timer paused: idle for \(Int(idle))s (\(secondsBeforePause)s banked)")
+        } else if state == .paused, pauseReason == .idle,
+                  TimerRules.isBackFromIdle(secondsSinceInput: idle, trigger: settings.pauseTrigger) {
+            Log.info("User is back after an idle pause — starting a full work session")
+            resumeFromAutomaticPause()
+        }
+    }
+
+    /// Lifting a lock/idle pause is always a fresh cycle: the user was away,
+    /// which is what the break was for.
+    private func resumeFromAutomaticPause() {
         beginWorking(seconds: workDurationSeconds)
     }
 
@@ -322,11 +374,19 @@ class TimerManager: ObservableObject {
         }
     }
 
-    // Called when the user toggles "Pause When Screen Locks".
-    func pauseWhenLockedSettingChanged(enabled: Bool) {
-        guard !enabled, state == .paused, pauseReason == .locked else { return }
-        Log.info("Lock pause disabled while locked — resuming")
-        beginWorking(seconds: workDurationSeconds)
+    // Called when the user picks a different pause trigger in the menu.
+    func pauseTriggerSettingChanged(_ trigger: PauseTrigger) {
+        guard state == .paused else { return }
+        switch pauseReason {
+        case .locked where !trigger.pausesOnLock:
+            Log.info("Lock pause disabled while paused — resuming")
+            resumeFromAutomaticPause()
+        case .idle where !trigger.pausesOnIdle:
+            Log.info("Idle pause disabled while paused — resuming")
+            resumeFromAutomaticPause()
+        default:
+            break
+        }
     }
 
     // MARK: - Private
@@ -381,6 +441,7 @@ class TimerManager: ObservableObject {
         // Check for meetings every 5 seconds
         if tickCount % 5 == 0 {
             if pauseDuringMeetings { checkMeetingStatus() }
+            checkIdleStatus()
         }
 
         switch state {

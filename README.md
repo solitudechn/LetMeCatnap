@@ -48,6 +48,7 @@ The break reminder also respects full screen apps. If you're watching a movie or
 4. Optionally take a longer break every N completed work sessions with **Pomodoro Rhythm / 番茄节奏** (manual breaks do not consume a work session)
 5. If you're on a call, the break waits until you're done
 6. Lock your screen and step away — the timer pauses, and unlocks into a fresh cycle
+   (reminders → pause when: lock screen, idle, either, or never)
 
 <div align="center">
   <img src="assets/menu.png" alt="iCanHazRepose menu" width="280"/>
@@ -63,9 +64,11 @@ iCanHazRepose checks the hardware directly. It uses CoreMediaIO to detect active
 
 This means it works with Zoom, Meet, FaceTime, Teams, Slack huddles, and whatever you end up using next year. Zero configuration.
 
-## Screen lock detection
+## When the timer pauses
 
-Most break apps pause on keyboard inactivity — but "no keyboard for two minutes" also describes reading a document, which is exactly when you need the reminder. iCanHazRepose waits for the signal that actually means you left: the screen locking, or the display going to sleep. Unlock and you get a fresh work cycle, because a locked screen is a real break.
+Most break apps pause on keyboard inactivity — but "no keyboard for two minutes" also describes reading a document, which is exactly when you need the reminder. By default iCanHazRepose waits for the signal that actually means you left: the screen locking, or the display going to sleep. Unlock and you get a fresh work cycle, because a locked screen is a real break.
+
+If you never lock your screen, **Reminders → Pause When** offers the idle-based behaviour instead: pause only (`Idle for 5 Minutes`), both signals (`Screen Locks or Idle`), or never pause automatically. Idle is opt-in because it is the noisy one — five minutes without input is the threshold, so reading a document is no longer mistaken for leaving.
 
 The break screen hides its countdown after three seconds and puts the guidance front and centre — staring at a ticking number is the opposite of resting your eyes. Tap the ring to see the time left. Escape always closes a break.
 

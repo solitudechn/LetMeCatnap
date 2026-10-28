@@ -17,6 +17,13 @@ public enum TimerRules {
     public static let imminentThreshold = 60
     /// Fade the break overlay's countdown after this many seconds.
     public static let countdownVisibleSeconds: TimeInterval = 3
+    /// No input for this long counts as having left the desk. Only consulted
+    /// when `PauseTrigger.pausesOnIdle` is selected; five minutes is long
+    /// enough that reading a document does not look like an absence.
+    public static let idleThresholdSeconds: TimeInterval = 300
+    /// How long the user must be back (seconds since last input) before an
+    /// idle pause is lifted.
+    public static let idleReturnSeconds: TimeInterval = 5
 
     public static func clamp(_ value: Int, to range: ClosedRange<Int>) -> Int {
         Swift.min(Swift.max(value, range.lowerBound), range.upperBound)
@@ -71,6 +78,26 @@ public enum TimerRules {
         threshold: Int = imminentThreshold
     ) -> Bool {
         enabled && isWorking && remaining > 0 && remaining <= threshold
+    }
+
+    // MARK: - Away detection
+
+    /// Whether an idle pause should start now. Only consulted when the user
+    /// picked an idle-aware trigger.
+    public static func shouldPauseForIdle(
+        secondsSinceInput: TimeInterval,
+        trigger: PauseTrigger,
+        isWorking: Bool
+    ) -> Bool {
+        trigger.pausesOnIdle && isWorking && secondsSinceInput >= idleThresholdSeconds
+    }
+
+    /// Whether the user is demonstrably back at the keyboard.
+    public static func isBackFromIdle(
+        secondsSinceInput: TimeInterval,
+        trigger: PauseTrigger
+    ) -> Bool {
+        trigger.pausesOnIdle && secondsSinceInput < idleReturnSeconds
     }
 
     // MARK: - Skip streak

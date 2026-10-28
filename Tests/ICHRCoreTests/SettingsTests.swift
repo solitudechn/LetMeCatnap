@@ -27,7 +27,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(settings.longBreakEvery, 4)
         XCTAssertEqual(settings.longBreakSeconds, 900)
         XCTAssertTrue(settings.pauseDuringMeetings)
-        XCTAssertTrue(settings.pauseWhenLocked)
+        XCTAssertEqual(settings.pauseTrigger, .lockScreen)
         XCTAssertTrue(settings.allowSkipBreak)
         XCTAssertTrue(settings.progressiveReminders)
         XCTAssertFalse(settings.muteSounds)
@@ -78,18 +78,55 @@ final class SettingsTests: XCTestCase {
     }
 
     @MainActor
-    func testLegacyIdlePauseDisabledMigratesToLockPause() {
-        defaults.set(false, forKey: Settings.Key.legacyPauseWhenIdle)
+    func testLegacyDisabledPauseMigratesToNever() {
+        defaults.set(false, forKey: Settings.Key.legacyPauseWhenLocked)
         let settings = Settings(defaults: defaults)
-        XCTAssertFalse(settings.pauseWhenLocked)
+        XCTAssertEqual(settings.pauseTrigger, .never)
     }
 
     @MainActor
-    func testExplicitLockPauseWinsOverLegacyValue() {
-        defaults.set(false, forKey: Settings.Key.legacyPauseWhenIdle)
-        defaults.set(true, forKey: Settings.Key.pauseWhenLocked)
+    func testLegacyEnabledPauseMigratesToLockScreen() {
+        defaults.set(true, forKey: Settings.Key.legacyPauseWhenLocked)
         let settings = Settings(defaults: defaults)
-        XCTAssertTrue(settings.pauseWhenLocked)
+        XCTAssertEqual(settings.pauseTrigger, .lockScreen)
+    }
+
+    @MainActor
+    func testExplicitTriggerWinsOverLegacyValue() {
+        defaults.set(false, forKey: Settings.Key.legacyPauseWhenLocked)
+        defaults.set(PauseTrigger.idle.rawValue, forKey: Settings.Key.pauseTrigger)
+        let settings = Settings(defaults: defaults)
+        XCTAssertEqual(settings.pauseTrigger, .idle)
+    }
+
+    @MainActor
+    func testPauseTriggerPersistsAndClampsToKnownValues() {
+        let settings = Settings(defaults: defaults)
+        settings.setPauseTrigger(.lockScreenOrIdle)
+        XCTAssertEqual(defaults.integer(forKey: Settings.Key.pauseTrigger),
+                       PauseTrigger.lockScreenOrIdle.rawValue)
+        XCTAssertEqual(Settings(defaults: defaults).pauseTrigger, .lockScreenOrIdle)
+
+        settings.setPauseTrigger(.never)
+        XCTAssertEqual(Settings(defaults: defaults).pauseTrigger, .never)
+
+        // Unknown stored values fall back to the safe default instead of
+        // trapping on an invalid raw value.
+        defaults.set(99, forKey: Settings.Key.pauseTrigger)
+        XCTAssertEqual(Settings(defaults: defaults).pauseTrigger, .lockScreen)
+    }
+
+    func testTriggerPredicates() {
+        XCTAssertTrue(PauseTrigger.lockScreen.pausesOnLock)
+        XCTAssertFalse(PauseTrigger.lockScreen.pausesOnIdle)
+        XCTAssertFalse(PauseTrigger.idle.pausesOnLock)
+        XCTAssertTrue(PauseTrigger.idle.pausesOnIdle)
+        XCTAssertTrue(PauseTrigger.lockScreenOrIdle.pausesOnLock)
+        XCTAssertTrue(PauseTrigger.lockScreenOrIdle.pausesOnIdle)
+        XCTAssertFalse(PauseTrigger.never.pausesOnLock)
+        XCTAssertFalse(PauseTrigger.never.pausesOnIdle)
+        XCTAssertFalse(PauseTrigger.never.isEnabled)
+        XCTAssertEqual(PauseTrigger.allCases.count, 4)
     }
 
     @MainActor

@@ -76,6 +76,38 @@ final class TimerRulesTests: XCTestCase {
         XCTAssertFalse(TimerRules.showsSkipHint(streak: 9, enabled: false))
     }
 
+    func testIdlePauseOnlyWhenTriggerAllowsIt() {
+        let threshold = TimerRules.idleThresholdSeconds
+        // Lock-screen trigger: idle time is irrelevant.
+        XCTAssertFalse(TimerRules.shouldPauseForIdle(
+            secondsSinceInput: threshold * 10, trigger: .lockScreen, isWorking: true
+        ))
+        // Idle triggers: only while working, only past the threshold.
+        XCTAssertFalse(TimerRules.shouldPauseForIdle(
+            secondsSinceInput: threshold - 1, trigger: .idle, isWorking: true
+        ))
+        XCTAssertTrue(TimerRules.shouldPauseForIdle(
+            secondsSinceInput: threshold, trigger: .idle, isWorking: true
+        ))
+        XCTAssertTrue(TimerRules.shouldPauseForIdle(
+            secondsSinceInput: threshold + 1, trigger: .lockScreenOrIdle, isWorking: true
+        ))
+        XCTAssertFalse(TimerRules.shouldPauseForIdle(
+            secondsSinceInput: threshold + 1, trigger: .idle, isWorking: false
+        ))
+        XCTAssertFalse(TimerRules.shouldPauseForIdle(
+            secondsSinceInput: threshold + 1, trigger: .never, isWorking: true
+        ))
+    }
+
+    func testIdleReturnRequiresRecentInput() {
+        XCTAssertTrue(TimerRules.isBackFromIdle(secondsSinceInput: 0, trigger: .idle))
+        XCTAssertTrue(TimerRules.isBackFromIdle(secondsSinceInput: 4, trigger: .lockScreenOrIdle))
+        XCTAssertFalse(TimerRules.isBackFromIdle(secondsSinceInput: 30, trigger: .idle))
+        XCTAssertFalse(TimerRules.isBackFromIdle(secondsSinceInput: 0, trigger: .lockScreen))
+        XCTAssertFalse(TimerRules.isBackFromIdle(secondsSinceInput: 0, trigger: .never))
+    }
+
     func testFormatTime() {
         XCTAssertEqual(TimerRules.formatTime(0), "0:00")
         XCTAssertEqual(TimerRules.formatTime(59), "0:59")

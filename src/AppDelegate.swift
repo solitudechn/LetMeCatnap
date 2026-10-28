@@ -18,7 +18,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     /// Boolean preferences, encoded as menu tags so one action can toggle them.
     private enum BoolSetting: Int, CaseIterable {
         case pauseDuringMeetings
-        case pauseWhenLocked
         case allowSkipBreak
         case progressiveReminders
         case muteSounds
@@ -27,7 +26,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         var title: String {
             switch self {
             case .pauseDuringMeetings: return L10n.pauseDuringMeetings
-            case .pauseWhenLocked: return L10n.pauseWhenLocked
             case .allowSkipBreak: return L10n.allowSkipBreak
             case .progressiveReminders: return L10n.progressiveReminders
             case .muteSounds: return L10n.muteSounds
@@ -44,6 +42,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     private var workIntervalMenu: NSMenu!
     private var breakDurationMenu: NSMenu!
     private var pomodoroMenu: NSMenu!
+    private var pauseTriggerMenu: NSMenu!
     private var boolSettingItems: [NSMenuItem] = []
     private var launchAtLoginMenuItem: NSMenuItem!
     private var languageMenu: NSMenu!
@@ -72,7 +71,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
 
         Log.info("App started")
         Log.info("Log file: \(Log.fileURL.path)")
-        Log.info("Config: work=\(settings.workMinutes)min, break=\(settings.breakSeconds)s, pauseDuringMeetings=\(settings.pauseDuringMeetings), pauseWhenLocked=\(settings.pauseWhenLocked), allowSkipBreak=\(settings.allowSkipBreak), muteSounds=\(settings.muteSounds), launchAtLogin=\(SMAppService.mainApp.status == .enabled)")
+        Log.info("Config: work=\(settings.workMinutes)min, break=\(settings.breakSeconds)s, pauseDuringMeetings=\(settings.pauseDuringMeetings), pauseTrigger=\(settings.pauseTrigger), allowSkipBreak=\(settings.allowSkipBreak), muteSounds=\(settings.muteSounds), launchAtLogin=\(SMAppService.mainApp.status == .enabled)")
         Log.info("Rhythm: longBreakEvery=\(settings.longBreakEvery), longBreak=\(settings.longBreakSeconds)s, progressiveReminders=\(settings.progressiveReminders)")
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -147,6 +146,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         let reminderItem = NSMenuItem(title: L10n.reminderSettings, action: nil, keyEquivalent: "")
         let reminderMenu = NSMenu()
         boolSettingItems = []
+        reminderMenu.addItem(makePauseTriggerItem())
+        reminderMenu.addItem(.separator())
         for setting in BoolSetting.allCases {
             let item = NSMenuItem(
                 title: setting.title,
@@ -209,6 +210,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     }
 
     // MARK: - Settings submenus
+
+    /// Radio group: what counts as "the user left the desk".
+    private func makePauseTriggerItem() -> NSMenuItem {
+        let item = NSMenuItem(title: L10n.pauseTrigger, action: nil, keyEquivalent: "")
+        pauseTriggerMenu = NSMenu()
+        for trigger in PauseTrigger.allCases {
+            let option = NSMenuItem(
+                title: title(for: trigger),
+                action: #selector(setPauseTrigger(_:)),
+                keyEquivalent: ""
+            )
+            option.target = self
+            option.tag = trigger.rawValue
+            pauseTriggerMenu.addItem(option)
+        }
+        item.submenu = pauseTriggerMenu
+        return item
+    }
+
+    private func title(for trigger: PauseTrigger) -> String {
+        switch trigger {
+        case .lockScreen: return L10n.triggerLockScreen
+        case .idle: return L10n.triggerIdle
+        case .lockScreenOrIdle: return L10n.triggerBoth
+        case .never: return L10n.triggerNever
+        }
+    }
 
     private func makeWorkIntervalItem() -> NSMenuItem {
         let item = NSMenuItem(title: L10n.workInterval, action: nil, keyEquivalent: "")
@@ -338,6 +366,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
             item.state = item.tag == rhythmTag ? .on : .off
         }
 
+        // Pause trigger radio group
+        for item in pauseTriggerMenu.items {
+            item.state = item.tag == settings.pauseTrigger.rawValue ? .on : .off
+        }
+
         // Boolean settings
         for item in boolSettingItems {
             guard let setting = BoolSetting(rawValue: item.tag) else { continue }
@@ -357,7 +390,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     private func boolValue(for setting: BoolSetting) -> Bool {
         switch setting {
         case .pauseDuringMeetings: return settings.pauseDuringMeetings
-        case .pauseWhenLocked: return settings.pauseWhenLocked
         case .allowSkipBreak: return settings.allowSkipBreak
         case .progressiveReminders: return settings.progressiveReminders
         case .muteSounds: return settings.muteSounds
@@ -370,9 +402,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         case .pauseDuringMeetings:
             settings.setPauseDuringMeetings(value)
             timerManager.pauseDuringMeetingsSettingChanged(enabled: value)
-        case .pauseWhenLocked:
-            settings.setPauseWhenLocked(value)
-            timerManager.pauseWhenLockedSettingChanged(enabled: value)
         case .allowSkipBreak:
             settings.setAllowSkipBreak(value)
         case .progressiveReminders:
@@ -420,6 +449,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
             switch timerManager.currentPauseReason {
             case .meeting, .breakPending: icon = "video.fill"
             case .locked: icon = "lock.fill"
+            case .idle: icon = "moon.zzz"
             default: icon = "pause.circle"
             }
         }
@@ -463,6 +493,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         let seconds = sender.tag % 10_000
         settings.setLongBreak(every: every, seconds: seconds)
         Log.info("Pomodoro rhythm: every=\(every), longBreak=\(seconds)s")
+    }
+
+    @objc private func setPauseTrigger(_ sender: NSMenuItem) {
+        guard let trigger = PauseTrigger(rawValue: sender.tag) else { return }
+        settings.setPauseTrigger(trigger)
+        timerManager.pauseTriggerSettingChanged(trigger)
+        Log.info("Pause trigger changed to \(trigger)")
     }
 
     @objc private func toggleBoolSetting(_ sender: NSMenuItem) {

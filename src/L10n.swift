@@ -76,7 +76,12 @@ extension L10n {
     static var workInterval: String        { t("Work Interval", "工作时长") }
     static var breakDuration: String       { t("Break Duration", "休息时长") }
     static var pauseDuringMeetings: String { t("Pause During Meetings", "会议中自动暂停") }
-    static var pauseWhenLocked: String    { t("Pause When Screen Locks", "锁屏时自动暂停") }
+    /// Submenu title: what makes the timer pause automatically.
+    static var pauseTrigger: String        { t("Pause When", "暂停时机") }
+    static var triggerLockScreen: String   { t("Screen Locks", "锁屏时") }
+    static var triggerIdle: String         { t("Idle for 5 Minutes", "空闲 5 分钟时") }
+    static var triggerBoth: String         { t("Screen Locks or Idle", "锁屏或空闲时") }
+    static var triggerNever: String        { t("Never", "从不") }
     static var allowSkipBreak: String      { t("Allow Skip Break", "允许跳过休息") }
     static var muteSounds: String          { t("Mute Sounds", "静音") }
     static var hideMenuBarTimer: String    { t("Hide Timer in Menu Bar", "隐藏菜单栏倒计时") }
@@ -104,6 +109,7 @@ extension L10n {
     static var meetingInProgress: String { t("Meeting", "会议中") }
     static var inMeeting: String         { t("In meeting", "会议中") }
     static var locked: String            { t("Locked", "锁屏") }
+    static func idleCountdown(_ time: String) -> String { t("Idle \(time)", "空闲 \(time)") }
     static var onBreak: String            { t("On a break", "休息中") }
     static func nextBreakIn(_ time: String) -> String {
         t("Next break in \(time)", "下次休息 \(time)")
@@ -116,6 +122,7 @@ extension L10n {
     static func breakPending(_ source: String) -> String { t("\(source) — Break pending", "\(source) — 待休息") }
     static var inMeetingBreakPending: String { t("In meeting — Break pending", "会议中 — 待休息") }
     static var pausedLocked: String { t("Paused — Screen locked", "已暂停 — 锁屏") }
+    static var pausedIdle: String { t("Paused — Idle", "已暂停 — 空闲") }
     static var paused: String     { t("Paused", "已暂停") }
 
     // ── Meeting detection (MeetingDetector.meetingSource) ───────
