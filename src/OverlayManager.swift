@@ -1,7 +1,7 @@
 import AppKit
-import SwiftUI
 import Carbon
 import ICHRCore
+import SwiftUI
 
 private class KeyablePanel: NSPanel {
     override var canBecomeKey: Bool { true }
@@ -171,8 +171,8 @@ class OverlayManager {
         // Hotkey 1: Escape (no modifiers)
         var hotKeyRef1: EventHotKeyRef?
         let status1 = RegisterEventHotKey(
-            0x35, // kVK_Escape
-            0,    // no modifiers
+            0x35,  // kVK_Escape
+            0,  // no modifiers
             EventHotKeyID(signature: signature, id: 1),
             GetApplicationEventTarget(),
             0,
@@ -185,8 +185,8 @@ class OverlayManager {
         // Hotkey 2: Ctrl+Escape
         var hotKeyRef2: EventHotKeyRef?
         let status2 = RegisterEventHotKey(
-            0x35,               // kVK_Escape
-            UInt32(controlKey), // ctrl modifier
+            0x35,  // kVK_Escape
+            UInt32(controlKey),  // ctrl modifier
             EventHotKeyID(signature: signature, id: 2),
             GetApplicationEventTarget(),
             0,
@@ -215,13 +215,15 @@ class OverlayManager {
                     return OSStatus(eventNotHandledErr)
                 }
                 var hkCom = EventHotKeyID()
-                guard GetEventParameter(
-                    theEvent,
-                    EventParamName(kEventParamDirectObject),
-                    EventParamType(typeEventHotKeyID),
-                    nil, MemoryLayout<EventHotKeyID>.size, nil,
-                    &hkCom
-                ) == noErr, (hkCom.id == 1 || hkCom.id == 2) else { return OSStatus(eventNotHandledErr) }
+                guard
+                    GetEventParameter(
+                        theEvent,
+                        EventParamName(kEventParamDirectObject),
+                        EventParamType(typeEventHotKeyID),
+                        nil, MemoryLayout<EventHotKeyID>.size, nil,
+                        &hkCom
+                    ) == noErr, hkCom.id == 1 || hkCom.id == 2
+                else { return OSStatus(eventNotHandledErr) }
 
                 let ctx = Unmanaged<EscapeHandlerContext>.fromOpaque(userData).takeUnretainedValue()
                 ctx.handler()

@@ -1,6 +1,7 @@
-import Foundation
-import CoreMediaIO
 import CoreAudio
+import CoreMediaIO
+import Foundation
+import ICHRCore
 
 class MeetingDetector: ObservableObject {
     @Published var isInMeeting: Bool = false
@@ -12,10 +13,10 @@ class MeetingDetector: ObservableObject {
 
         if cameraActive {
             isInMeeting = true
-            meetingSource = L10n.cameraInUse
+            meetingSource = L10n.t(.cameraInUse)
         } else if micActive {
             isInMeeting = true
-            meetingSource = L10n.microphoneInUse
+            meetingSource = L10n.t(.microphoneInUse)
         } else {
             reset()
         }

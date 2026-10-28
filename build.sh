@@ -4,7 +4,10 @@ set -euo pipefail
 
 name="iCanHazRepose"
 shortName="iCHR"
-ident="wtf.d7.icanhazrepose"
+# Must match `BundleIdentity.identifier` in core/BundleIdentity.swift and
+# CFBundleIdentifier in Info.plist. The ad-hoc signing requirement below is
+# pinned to it, and the updater relies on the requirement surviving an update.
+ident="io.github.solitudechn.icanhazrepose"
 loc="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 logFile="$loc/build.log"
 logMark=1
@@ -55,6 +58,11 @@ fi
 # version comes from the git tag instead of Info.plist).
 ICHR_VERSION="${ICHR_VERSION:-}"
 ICHR_VERSION="${ICHR_VERSION#v}"
+
+# Extra flags for every `swift` invocation. Set `ICHR_SWIFT_FLAGS=--disable-sandbox`
+# where SwiftPM's manifest sandbox cannot run (nested sandboxes, some CI
+# containers); it is not needed on a normal machine or on GitHub's runners.
+swiftExtra="${ICHR_SWIFT_FLAGS:-}"
 
 # ── Toolchain ────────────────────────────────────────────────────────
 # SwiftUI macros (@State and friends) only resolve against a full Xcode.
@@ -186,11 +194,11 @@ do_clean_dist() {
 }
 
 do_resolve_deps() {
-    swift package resolve
+    swift package resolve $swiftExtra
 }
 
 do_clean_build() {
-    swift package clean
+    swift package clean $swiftExtra
 }
 
 do_compile_arm64() {
@@ -208,9 +216,9 @@ do_compile_x86_64() {
 # and keep a per-arch copy, which works on old and new toolchains alike.
 compile_arch() {
     local arch="$1"
-    swift build -c "$buildConfig" --arch "$arch"
+    swift build -c "$buildConfig" --arch "$arch" $swiftExtra
     local binDir
-    binDir=$(swift build -c "$buildConfig" --arch "$arch" --show-bin-path)
+    binDir=$(swift build -c "$buildConfig" --arch "$arch" --show-bin-path $swiftExtra)
     mkdir -p "$loc/.build/stage/$arch"
     cp "$binDir/$name" "$loc/.build/stage/$arch/$name"
 }
@@ -258,17 +266,71 @@ do_create_bundle() {
     fi
 }
 
+# Sparkle ships as an XCFramework through SwiftPM. SwiftPM links the executable
+# against `@rpath/Sparkle.framework/...` and only adds its own build directory to
+# the rpath, so the framework has to be copied into the bundle and the app's
+# rpath pointed at it — otherwise the app dies at launch with a dyld error on
+# every machine except the one that built it.
+do_embed_sparkle() {
+    local source
+    source=$(find "$loc/.build/artifacts" -maxdepth 6 -type d \
+        -path "*/Sparkle.xcframework/macos-*/Sparkle.framework" | head -1)
+    if [ -z "$source" ]; then
+        echo "Sparkle.framework not found under .build/artifacts — run 'swift package resolve'"
+        return 1
+    fi
+    echo "embedding: $source"
+
+    local frameworks="$loc/dist/$name.app/Contents/Frameworks"
+    mkdir -p "$frameworks"
+    ditto "$source" "$frameworks/Sparkle.framework"
+
+    local binary="$loc/dist/$name.app/Contents/MacOS/$name"
+    if ! otool -l "$binary" | grep -q "@executable_path/../Frameworks"; then
+        install_name_tool -add_rpath "@executable_path/../Frameworks" "$binary"
+    fi
+    echo "rpath: @executable_path/../Frameworks"
+
+    # The app must not rely on the rpath alone: prove the dependency resolves.
+    if ! otool -L "$binary" | grep -q "@rpath/Sparkle.framework"; then
+        echo "executable is not linked against Sparkle"
+        return 1
+    fi
+}
+
 do_codesign() {
     xattr -cr "$loc/dist/$name.app"
+
+    # Sign from the inside out: Sparkle's helper apps and XPC services first, then
+    # the framework that contains them, then the app. `--deep` would attempt the
+    # same order but is deprecated and quietly skips nested code it does not
+    # recognise — which leaves a Sparkle that cannot install an update.
+    local frameworks="$loc/dist/$name.app/Contents/Frameworks"
+    if [ -d "$frameworks" ]; then
+        while IFS= read -r -d '' nested; do
+            echo "signing nested: $nested"
+            sign_code "$nested" "no"
+        done < <(find "$frameworks" -depth -type d \( -name "*.app" -o -name "*.xpc" \) -print0)
+        sign_code "$frameworks/Sparkle.framework" "no"
+    fi
+
+    sign_code "$loc/dist/$name.app" "yes"
+}
+
+# $1 = path, $2 = "yes" to pin the ad-hoc designated requirement.
+sign_code() {
+    local target="$1"
+    local pin="$2"
     if [ "$can_sign" = true ]; then
-        codesign --force --deep --sign "$ICHR_SIGNING_IDENTITY" \
-            --options runtime \
-            --timestamp \
-            "$loc/dist/$name.app"
+        codesign --force --sign "$ICHR_SIGNING_IDENTITY" --options runtime --timestamp "$target"
+    elif [ "$pin" = "yes" ]; then
+        # Without a stable designated requirement the ad-hoc signature degrades to
+        # a cdhash, which changes on every build.
+        codesign --force --sign - -r="designated => identifier \"$ident\"" "$target"
     else
-        codesign --force --deep --sign - \
-            -r="designated => identifier \"$ident\"" \
-            "$loc/dist/$name.app"
+        # Nested Sparkle code keeps its own identifier — pinning ours onto it
+        # would make the XPC services indistinguishable from the app.
+        codesign --force --sign - "$target"
     fi
 }
 
@@ -369,9 +431,9 @@ do_upload() {
 
 # ── Calculate total steps per mode ───────────────────────────────────
 case "$mode" in
-    dev)         totalSteps=5 ;;
+    dev)         totalSteps=6 ;;
     dev-release)
-        totalSteps=8
+        totalSteps=9
         if [ "$can_upload" = true ]; then
             totalSteps=$((totalSteps + 1))
         fi
@@ -383,7 +445,7 @@ case "$mode" in
         fi
         ;;
     release)
-        totalSteps=9
+        totalSteps=10
         if [ "$can_sign" = true ]; then
             totalSteps=$((totalSteps + 1))
         fi
@@ -395,7 +457,7 @@ case "$mode" in
         fi
         ;;
     ci)
-        totalSteps=9
+        totalSteps=10
         if [ "$can_sign" = true ]; then
             totalSteps=$((totalSteps + 1))
         fi
@@ -423,6 +485,7 @@ if [ "$mode" != "dev" ]; then
 fi
 
 run_step "Creating APP bundle..."                 "failed to create app bundle"              do_create_bundle
+run_step "Embedding Sparkle framework..."         "failed to embed Sparkle.framework"        do_embed_sparkle
 run_step "Code-signing APP bundle..."             "failed to code-sign app bundle"           do_codesign
 
 if [ "$mode" != "dev" ]; then

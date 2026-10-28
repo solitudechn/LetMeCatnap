@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 /// Single source of truth for every user preference.
 ///
@@ -14,7 +14,7 @@ import Combine
 /// one-time migration below.
 @MainActor
 public final class Settings: ObservableObject {
-    public static let shared = Settings()
+    public static let shared = Settings(defaults: .standard, migrateLegacy: true)
 
     /// Keys stay as plain strings so existing installs keep their values.
     public enum Key {
@@ -30,9 +30,24 @@ public final class Settings: ObservableObject {
         public static let hideMenuBarTimer = "hideMenuBarTimer"
         public static let longBreakEvery = "longBreakEvery"
         public static let longBreakSeconds = "longBreakSeconds"
-        public static let skippedUpdate = "skippedUpdate"
-        public static let lastUpdateCheck = "lastUpdateCheck"
         public static let hasCompletedWelcome = "hasCompletedWelcome"
+
+        /// Everything this app owns. Used by the bundle-identifier migration.
+        public static let all = [
+            workMinutes,
+            breakSeconds,
+            pauseDuringMeetings,
+            pauseTrigger,
+            legacyPauseWhenLocked,
+            allowSkipBreak,
+            progressiveReminders,
+            muteSounds,
+            hideMenuBarTimer,
+            longBreakEvery,
+            longBreakSeconds,
+            hasCompletedWelcome,
+            L10n.languageDefaultsKey,
+        ]
     }
 
     /// Factory values, used when a key has never been written.
@@ -66,16 +81,23 @@ public final class Settings: ObservableObject {
     @Published public private(set) var muteSounds: Bool
     @Published public private(set) var hideMenuBarTimer: Bool
 
-    @Published public private(set) var skippedUpdateVersion: String?
-    /// When the last successful update check happened. Persisted so a menu bar
-    /// app that is restarted often still checks once a day instead of never.
-    @Published public private(set) var lastUpdateCheck: Date?
     @Published public private(set) var hasCompletedWelcome: Bool
+
+    /// `true` when this launch copied preferences over from a previous bundle
+    /// identifier. Surfaced so the app can say so in its log.
+    public private(set) var migratedLegacyPreferences = false
 
     // MARK: - Init
 
-    public init(defaults: UserDefaults = .standard) {
+    /// - Parameter migrateLegacy: copy preferences written under an older bundle
+    ///   identifier. Only the shared instance does this; tests would otherwise
+    ///   inherit whatever the developer's machine has stored.
+    public init(defaults: UserDefaults = .standard, migrateLegacy: Bool = false) {
         self.defaults = defaults
+
+        if migrateLegacy {
+            migratedLegacyPreferences = Self.migratePreferences(into: defaults)
+        }
 
         workMinutes = TimerRules.clamp(
             Self.integer(defaults, Key.workMinutes, fallback: Defaults.workMinutes),
@@ -114,7 +136,8 @@ public final class Settings: ObservableObject {
         // Idle pausing, which used to be the default, is deliberately not
         // restored: it is what made reading look like an absence.
         if let raw = Self.optionalInteger(defaults, Key.pauseTrigger),
-           let stored = PauseTrigger(rawValue: raw) {
+            let stored = PauseTrigger(rawValue: raw)
+        {
             pauseTrigger = stored
         } else if Self.optionalBoolean(defaults, Key.legacyPauseWhenLocked) == false {
             pauseTrigger = .never
@@ -122,10 +145,6 @@ public final class Settings: ObservableObject {
             pauseTrigger = Defaults.pauseTrigger
         }
 
-        skippedUpdateVersion = defaults.string(forKey: Key.skippedUpdate)
-        if let stamp = Self.optionalDouble(defaults, Key.lastUpdateCheck) {
-            lastUpdateCheck = Date(timeIntervalSince1970: stamp)
-        }
         hasCompletedWelcome = Self.boolean(
             defaults, Key.hasCompletedWelcome, fallback: Defaults.hasCompletedWelcome
         )
@@ -196,24 +215,41 @@ public final class Settings: ObservableObject {
 
     // MARK: - State flags
 
-    public func setSkippedUpdateVersion(_ value: String?) {
-        skippedUpdateVersion = value
-        if let value {
-            defaults.set(value, forKey: Key.skippedUpdate)
-        } else {
-            defaults.removeObject(forKey: Key.skippedUpdate)
-        }
-    }
-
-    public func markUpdateChecked(_ date: Date = Date()) {
-        lastUpdateCheck = date
-        defaults.set(date.timeIntervalSince1970, forKey: Key.lastUpdateCheck)
-    }
-
     public func markWelcomeCompleted() {
         guard !hasCompletedWelcome else { return }
         hasCompletedWelcome = true
         defaults.set(true, forKey: Key.hasCompletedWelcome)
+    }
+
+    // MARK: - Bundle-identifier migration
+
+    /// Copies preferences from a previous bundle identifier.
+    ///
+    /// `UserDefaults` are namespaced per bundle id, so renaming the app makes
+    /// every setting look unset — the timer silently resets to factory values.
+    /// This runs once, before the values below are read, and only when this
+    /// bundle has no values of its own yet.
+    ///
+    /// - Returns: `true` when at least one value was copied.
+    @discardableResult
+    public static func migratePreferences(
+        into defaults: UserDefaults = .standard,
+        from legacyIdentifiers: [String] = BundleIdentity.legacyIdentifiers
+    ) -> Bool {
+        guard !Key.all.contains(where: { defaults.object(forKey: $0) != nil }) else {
+            return false
+        }
+        for identifier in legacyIdentifiers {
+            guard let legacy = UserDefaults(suiteName: identifier) else { continue }
+            var copied = 0
+            for key in Key.all {
+                guard let value = legacy.object(forKey: key) else { continue }
+                defaults.set(value, forKey: key)
+                copied += 1
+            }
+            if copied > 0 { return true }
+        }
+        return false
     }
 
     // MARK: - Persistence helpers

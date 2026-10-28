@@ -9,7 +9,7 @@
 	<key>CFBundleIconFile</key>
 	<string>main.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>wtf.d7.icanhazrepose</string>
+	<string>io.github.solitudechn.icanhazrepose</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -19,13 +19,13 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleVersion</key>
-	<string>1.0.5</string>
+	<string>1.1.0</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.5</string>
+	<string>1.1.0</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>MIT License. Originally by Fikri Karim, then Ivan "deseven" Novohatski.</string>
+	<string>MIT License. Originally by Fikri Karim, then Ivan "deseven" Novohatski. Simplified Chinese localization by solitudechn.</string>
 	<key>CSResourcesFileMapped</key>
 	<true/>
 	<key>NSHighResolutionCapable</key>
@@ -34,5 +34,21 @@
 	<true/>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
+
+	<!-- Sparkle: the feed lives next to the newest release, so cutting a release
+	     is the only step needed to make an update visible. Every entry in it must
+	     be signed with the Ed25519 key whose public half is below. -->
+	<key>SUFeedURL</key>
+	<string>https://github.com/solitudechn/iCanHazRepose/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>6hUz1htBo9LKDPpkagB7sVCyqFpaZdwGgIsoXvxpT2o=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUAllowsAutomaticUpdates</key>
+	<false/>
 </dict>
 </plist>

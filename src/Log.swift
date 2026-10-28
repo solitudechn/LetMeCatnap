@@ -13,11 +13,13 @@ enum Log {
 
     /// `~/Library/Logs/iCanHazRepose/iCanHazRepose.log`
     static var fileURL: URL {
-        let base = FileManager.default
+        let base =
+            FileManager.default
             .urls(for: .libraryDirectory, in: .userDomainMask)
             .first
             ?? URL(fileURLWithPath: NSHomeDirectory() + "/Library", isDirectory: true)
-        return base
+        return
+            base
             .appendingPathComponent("Logs", isDirectory: true)
             .appendingPathComponent(folderName, isDirectory: true)
             .appendingPathComponent("iCanHazRepose.log", isDirectory: false)
@@ -40,7 +42,7 @@ enum Log {
 
     private static func write(_ level: String, _ message: String) {
         #if DEBUG
-        print("[iCHR] \(message)")
+            print("[iCHR] \(message)")
         #endif
         let stamp = timestamp()
         queue.async {
@@ -66,8 +68,9 @@ enum Log {
         )
 
         if let attributes = try? fm.attributesOfItem(atPath: url.path),
-           let size = (attributes[.size] as? NSNumber)?.intValue,
-           size > maxFileSize {
+            let size = (attributes[.size] as? NSNumber)?.intValue,
+            size > maxFileSize
+        {
             let backup = url.deletingPathExtension().appendingPathExtension("1.log")
             try? fm.removeItem(at: backup)
             try? fm.moveItem(at: url, to: backup)

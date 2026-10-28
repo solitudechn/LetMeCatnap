@@ -1,5 +1,6 @@
-import XCTest
 import Combine
+import XCTest
+
 @testable import ICHRCore
 
 final class SettingsTests: XCTestCase {
@@ -33,7 +34,6 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(settings.muteSounds)
         XCTAssertFalse(settings.hideMenuBarTimer)
         XCTAssertFalse(settings.hasCompletedWelcome)
-        XCTAssertNil(settings.skippedUpdateVersion)
     }
 
     @MainActor
@@ -103,8 +103,9 @@ final class SettingsTests: XCTestCase {
     func testPauseTriggerPersistsAndClampsToKnownValues() {
         let settings = Settings(defaults: defaults)
         settings.setPauseTrigger(.lockScreenOrIdle)
-        XCTAssertEqual(defaults.integer(forKey: Settings.Key.pauseTrigger),
-                       PauseTrigger.lockScreenOrIdle.rawValue)
+        XCTAssertEqual(
+            defaults.integer(forKey: Settings.Key.pauseTrigger),
+            PauseTrigger.lockScreenOrIdle.rawValue)
         XCTAssertEqual(Settings(defaults: defaults).pauseTrigger, .lockScreenOrIdle)
 
         settings.setPauseTrigger(.never)
@@ -129,34 +130,41 @@ final class SettingsTests: XCTestCase {
     }
 
     @MainActor
-    func testSkippedAndWelcomeFlagsPersist() {
+    func testWelcomeFlagPersists() {
         let settings = Settings(defaults: defaults)
-        settings.setSkippedUpdateVersion("1.2.3")
         settings.markWelcomeCompleted()
 
-        let reloaded = Settings(defaults: defaults)
-        XCTAssertEqual(reloaded.skippedUpdateVersion, "1.2.3")
-        XCTAssertTrue(reloaded.hasCompletedWelcome)
-
-        reloaded.setSkippedUpdateVersion(nil)
-        XCTAssertNil(Settings(defaults: defaults).skippedUpdateVersion)
+        XCTAssertTrue(Settings(defaults: defaults).hasCompletedWelcome)
     }
 
     @MainActor
-    func testLastUpdateCheckPersists() {
-        let settings = Settings(defaults: defaults)
-        XCTAssertNil(settings.lastUpdateCheck, "no check recorded on a fresh install")
+    func testPreferencesMigrateFromLegacyBundleIdentifier() {
+        let legacySuite = "ICHRCoreTests.legacy." + UUID().uuidString
+        let legacy = UserDefaults(suiteName: legacySuite)!
+        legacy.removePersistentDomain(forName: legacySuite)
+        defer { legacy.removePersistentDomain(forName: legacySuite) }
 
-        let stamp = Date(timeIntervalSince1970: 1_700_000_000)
-        settings.markUpdateChecked(stamp)
+        legacy.set(45, forKey: Settings.Key.workMinutes)
+        legacy.set(false, forKey: Settings.Key.allowSkipBreak)
+        legacy.set(AppLanguage.chinese.rawValue, forKey: L10n.languageDefaultsKey)
 
-        let reloaded = Settings(defaults: defaults).lastUpdateCheck
-        XCTAssertNotNil(reloaded)
-        XCTAssertEqual(
-            reloaded?.timeIntervalSince1970 ?? 0,
-            stamp.timeIntervalSince1970,
-            accuracy: 0.001
+        XCTAssertTrue(
+            Settings.migratePreferences(into: defaults, from: [legacySuite]),
+            "values stored under the old bundle id should be copied"
         )
+        XCTAssertEqual(defaults.integer(forKey: Settings.Key.workMinutes), 45)
+        XCTAssertEqual(defaults.object(forKey: Settings.Key.allowSkipBreak) as? Bool, false)
+        XCTAssertEqual(defaults.string(forKey: L10n.languageDefaultsKey), "zh")
+
+        // The migrated values must survive into a live Settings instance.
+        let settings = Settings(defaults: defaults)
+        XCTAssertEqual(settings.workMinutes, 45)
+        XCTAssertFalse(settings.allowSkipBreak)
+
+        // Running it again must not overwrite anything.
+        defaults.set(25, forKey: Settings.Key.workMinutes)
+        XCTAssertFalse(Settings.migratePreferences(into: defaults, from: [legacySuite]))
+        XCTAssertEqual(defaults.integer(forKey: Settings.Key.workMinutes), 25)
     }
 
     @MainActor

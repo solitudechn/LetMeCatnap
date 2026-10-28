@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import ICHRCore
 
 final class TimerRulesTests: XCTestCase {
@@ -79,25 +80,31 @@ final class TimerRulesTests: XCTestCase {
     func testIdlePauseOnlyWhenTriggerAllowsIt() {
         let threshold = TimerRules.idleThresholdSeconds
         // Lock-screen trigger: idle time is irrelevant.
-        XCTAssertFalse(TimerRules.shouldPauseForIdle(
-            secondsSinceInput: threshold * 10, trigger: .lockScreen, isWorking: true
-        ))
+        XCTAssertFalse(
+            TimerRules.shouldPauseForIdle(
+                secondsSinceInput: threshold * 10, trigger: .lockScreen, isWorking: true
+            ))
         // Idle triggers: only while working, only past the threshold.
-        XCTAssertFalse(TimerRules.shouldPauseForIdle(
-            secondsSinceInput: threshold - 1, trigger: .idle, isWorking: true
-        ))
-        XCTAssertTrue(TimerRules.shouldPauseForIdle(
-            secondsSinceInput: threshold, trigger: .idle, isWorking: true
-        ))
-        XCTAssertTrue(TimerRules.shouldPauseForIdle(
-            secondsSinceInput: threshold + 1, trigger: .lockScreenOrIdle, isWorking: true
-        ))
-        XCTAssertFalse(TimerRules.shouldPauseForIdle(
-            secondsSinceInput: threshold + 1, trigger: .idle, isWorking: false
-        ))
-        XCTAssertFalse(TimerRules.shouldPauseForIdle(
-            secondsSinceInput: threshold + 1, trigger: .never, isWorking: true
-        ))
+        XCTAssertFalse(
+            TimerRules.shouldPauseForIdle(
+                secondsSinceInput: threshold - 1, trigger: .idle, isWorking: true
+            ))
+        XCTAssertTrue(
+            TimerRules.shouldPauseForIdle(
+                secondsSinceInput: threshold, trigger: .idle, isWorking: true
+            ))
+        XCTAssertTrue(
+            TimerRules.shouldPauseForIdle(
+                secondsSinceInput: threshold + 1, trigger: .lockScreenOrIdle, isWorking: true
+            ))
+        XCTAssertFalse(
+            TimerRules.shouldPauseForIdle(
+                secondsSinceInput: threshold + 1, trigger: .idle, isWorking: false
+            ))
+        XCTAssertFalse(
+            TimerRules.shouldPauseForIdle(
+                secondsSinceInput: threshold + 1, trigger: .never, isWorking: true
+            ))
     }
 
     func testIdleReturnRequiresRecentInput() {

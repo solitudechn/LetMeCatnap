@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "lineLength": 110,
+  "indentation": {
+    "spaces": 4
+  },
+  "respectsExistingLineBreaks": true,
+  "lineBreakBeforeControlFlowKeywords": false,
+  "lineBreakBeforeEachArgument": false,
+  "lineBreakBeforeEachGenericRequirement": false,
+  "maximumBlankLines": 1,
+  "indentSwitchCaseLabels": false,
+  "multiElementCollectionTrailingCommas": true
+}

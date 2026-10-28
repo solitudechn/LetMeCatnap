@@ -1,4 +1,5 @@
 import Cocoa
+import ICHRCore
 
 // MARK: - Link Button
 
@@ -95,7 +96,9 @@ class AboutViewController: NSViewController {
     /// Rebuilding the subviews (instead of the whole controller) keeps the
     /// window's size and position intact.
     func reloadForLanguageChange() {
-        view.subviews.forEach { $0.removeFromSuperview() }
+        for subview in view.subviews {
+            subview.removeFromSuperview()
+        }
         setupUI()
     }
 
@@ -132,13 +135,13 @@ class AboutViewController: NSViewController {
 
         // "check for updates" link
         checkUpdatesButton = ActionLinkButton(
-            title: L10n.checkForUpdates,
+            title: L10n.t(.checkForUpdates),
             target: self,
             action: #selector(checkForUpdatesClicked)
         )
 
         // "created by" section
-        let createdByLabel = NSTextField(labelWithString: L10n.createdBy)
+        let createdByLabel = NSTextField(labelWithString: L10n.t(.createdBy))
         createdByLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .bold)
         createdByLabel.textColor = .secondaryLabelColor
         createdByLabel.alignment = .center
@@ -147,7 +150,7 @@ class AboutViewController: NSViewController {
         let desevenLink = LinkButton(title: "deseven", url: AppConstants.websiteURL)
 
         // "original code by" section
-        let originalCodeByLabel = NSTextField(labelWithString: L10n.originalCodeBy)
+        let originalCodeByLabel = NSTextField(labelWithString: L10n.t(.originalCodeBy))
         originalCodeByLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .bold)
         originalCodeByLabel.textColor = .secondaryLabelColor
         originalCodeByLabel.alignment = .center
@@ -155,8 +158,19 @@ class AboutViewController: NSViewController {
 
         let fikriLink = LinkButton(title: "Fikri Karim", url: AppConstants.originalRepoURL)
 
+        // "Chinese localization by" section — this fork's own credit. MIT does not
+        // require it, but it is the community convention and it tells users where
+        // the 简体中文 interface came from.
+        let localizedByLabel = NSTextField(labelWithString: L10n.t(.localizedBy))
+        localizedByLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .bold)
+        localizedByLabel.textColor = .secondaryLabelColor
+        localizedByLabel.alignment = .center
+        localizedByLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let localizerLink = LinkButton(title: "solitudechn", url: AppConstants.githubRepoURL)
+
         // "icons by" section
-        let iconsByLabel = NSTextField(labelWithString: L10n.iconsBy)
+        let iconsByLabel = NSTextField(labelWithString: L10n.t(.iconsBy))
         iconsByLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .bold)
         iconsByLabel.textColor = .secondaryLabelColor
         iconsByLabel.alignment = .center
@@ -184,8 +198,9 @@ class AboutViewController: NSViewController {
             iconImageView, nameLabel, versionLabel, checkUpdatesButton,
             createdByLabel, desevenLink,
             originalCodeByLabel, fikriLink,
+            localizedByLabel, localizerLink,
             iconsByLabel, boxiconsLink,
-            socialStack
+            socialStack,
         ]
         for sv in leftSubviews {
             leftPanel.addSubview(sv)
@@ -216,7 +231,8 @@ class AboutViewController: NSViewController {
             checkUpdatesButton.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
             // "created by"
-            createdByLabel.topAnchor.constraint(equalTo: checkUpdatesButton.bottomAnchor, constant: sectionGap),
+            createdByLabel.topAnchor.constraint(
+                equalTo: checkUpdatesButton.bottomAnchor, constant: sectionGap),
             createdByLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
             // deseven link
@@ -231,8 +247,16 @@ class AboutViewController: NSViewController {
             fikriLink.topAnchor.constraint(equalTo: originalCodeByLabel.bottomAnchor, constant: tightGap),
             fikriLink.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
+            // "Chinese localization by"
+            localizedByLabel.topAnchor.constraint(equalTo: fikriLink.bottomAnchor, constant: sectionGap),
+            localizedByLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
+
+            // localizer link
+            localizerLink.topAnchor.constraint(equalTo: localizedByLabel.bottomAnchor, constant: tightGap),
+            localizerLink.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
+
             // "icons by"
-            iconsByLabel.topAnchor.constraint(equalTo: fikriLink.bottomAnchor, constant: sectionGap),
+            iconsByLabel.topAnchor.constraint(equalTo: localizerLink.bottomAnchor, constant: sectionGap),
             iconsByLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
             // boxicons link
@@ -319,97 +343,29 @@ class AboutViewController: NSViewController {
 
     // MARK: - Update Check
 
+    /// Sparkle owns the whole update flow — checking, downloading, installing,
+    /// the "you're up to date" dialog and every failure message — so this link
+    /// only has to kick it off. `nil` sender keeps Sparkle from trying to bind
+    /// the check to a menu item it does not know about.
     @objc private func checkForUpdatesClicked() {
-        guard !UpdateManager.shared.isChecking else { return }
-
-        checkUpdatesButton.title = L10n.checkingForUpdates
-        checkUpdatesButton.isEnabled = false
-
-        UpdateManager.shared.checkForUpdates(manual: true) { [weak self] result in
-            guard let self else { return }
-            self.checkUpdatesButton.title = L10n.checkForUpdates
-            self.checkUpdatesButton.isEnabled = true
-
-            switch result {
-            case .success(let updateInfo):
-                if let updateInfo = updateInfo {
-                    self.showUpdateDialog(updateInfo: updateInfo)
-                } else {
-                    let alert = NSAlert()
-                    alert.messageText = L10n.alreadyLatestVersion
-                    alert.alertStyle = .informational
-                    alert.addButton(withTitle: L10n.ok)
-                    if let window = self.view.window {
-                        alert.beginSheetModal(for: window)
-                    } else {
-                        alert.runModal()
-                    }
-                }
-            case .failure(let error):
-                let alert = NSAlert()
-                alert.messageText = L10n.failedToCheckUpdates
-                alert.informativeText = error.localizedDescription
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: L10n.ok)
-                if let window = self.view.window {
-                    alert.beginSheetModal(for: window)
-                } else {
-                    alert.runModal()
-                }
-            }
-        }
-    }
-
-    private func showUpdateDialog(updateInfo: UpdateInfo) {
-        guard let window = view.window else { return }
-
-        let dialogVC = UpdateDialogViewController(
-            updateInfo: updateInfo,
-            onUpdate: {
-                Task {
-                    do {
-                        try await UpdateManager.shared.downloadAndInstall(updateInfo)
-                    } catch {
-                        let alert = NSAlert()
-                        alert.messageText = L10n.updateFailed
-                        alert.informativeText = error.localizedDescription
-                        alert.alertStyle = .warning
-                        alert.addButton(withTitle: L10n.ok)
-                        alert.runModal()
-                    }
-                }
-            },
-            onSkip: {
-                UpdateManager.shared.skippedVersion = updateInfo.version
-            }
-        )
-
-        let sheetWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 340),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        sheetWindow.isReleasedWhenClosed = false
-        sheetWindow.contentViewController = dialogVC
-        sheetWindow.title = L10n.softwareUpdate
-
-        window.beginSheet(sheetWindow)
+        Updater.shared.checkForUpdates(nil)
     }
 
     // MARK: - Helpers
 
     private static func loadLicenseText() -> String {
         if let url = Bundle.main.url(forResource: "LICENSE", withExtension: nil),
-           let text = try? String(contentsOf: url, encoding: .utf8) {
+            let text = try? String(contentsOf: url, encoding: .utf8)
+        {
             return text
         }
-        return L10n.licenseUnavailable
+        return L10n.t(.licenseUnavailable)
     }
 
     private func makeIconButton(imageName: String, url: String) -> LinkButton {
         let originalImage = NSImage(named: imageName)
-        let image = (originalImage?.copy() as? NSImage)
+        let image =
+            (originalImage?.copy() as? NSImage)
             ?? NSImage(size: NSSize(width: 24, height: 24))
         image.isTemplate = true
         image.size = NSSize(width: 24, height: 24)

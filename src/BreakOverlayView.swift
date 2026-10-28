@@ -1,6 +1,6 @@
 import AppKit
-import SwiftUI
 import ICHRCore
+import SwiftUI
 
 struct BreakOverlayView: View {
     @ObservedObject var timerManager: TimerManager
@@ -90,16 +90,28 @@ struct BreakOverlayView: View {
                     .animation(.easeInOut(duration: 0.7), value: countdownVisible)
                     .contentShape(Circle())
                     .onTapGesture { revealTick += 1 }
-                    .help(L10n.showRemaining)
+                    .help(L10n.t(.showRemaining))
+                    // The ring is a progress arc: VoiceOver gets the remaining
+                    // time as a value instead of trying to describe the shape.
+                    // It stays readable after the digits fade out visually.
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(
+                        timerManager.isLongBreak ? L10n.t(.longBreakTitle) : L10n.t(.timeToRest)
+                    )
+                    .accessibilityValue(
+                        L10n.t(.timeRemaining, formatTime(timerManager.remainingSeconds))
+                    )
+                    .accessibilityHint(L10n.t(.showRemaining))
+                    .accessibilityAddTraits(.isButton)
 
                     VStack(spacing: 10) {
-                        Text(timerManager.isLongBreak ? L10n.longBreakTitle : L10n.timeToRest)
+                        Text(timerManager.isLongBreak ? L10n.t(.longBreakTitle) : L10n.t(.timeToRest))
                             .font(.system(size: 38, weight: .medium, design: .rounded))
                             .foregroundStyle(.white)
                             .opacity(appeared ? 1 : 0)
                             .offset(y: appeared ? 0 : 10)
 
-                        Text(timerManager.breakTip.isEmpty ? L10n.restHint : timerManager.breakTip)
+                        Text(timerManager.breakTip.isEmpty ? L10n.t(.restHint) : timerManager.breakTip)
                             .font(.system(size: 16, weight: .regular))
                             .foregroundStyle(.white.opacity(0.4))
                             .opacity(appeared ? 1 : 0)
@@ -107,7 +119,7 @@ struct BreakOverlayView: View {
                             .animation(.easeInOut(duration: 0.4), value: timerManager.breakTip)
 
                         if !countdownVisible {
-                            Text(L10n.showRemaining)
+                            Text(L10n.t(.showRemaining))
                                 .font(.system(size: 11, weight: .regular))
                                 .foregroundStyle(.white.opacity(0.18))
                                 .opacity(appeared ? 1 : 0)
@@ -117,7 +129,7 @@ struct BreakOverlayView: View {
                     // A nudge after repeated skips — the break can still be
                     // skipped, this only makes the choice visible.
                     if timerManager.showsSkipHint {
-                        Text(L10n.skipHint)
+                        Text(L10n.t(.skipHint))
                             .font(.system(size: 13, weight: .regular))
                             .foregroundStyle(.white.opacity(0.3))
                             .opacity(appeared ? 1 : 0)
@@ -127,10 +139,10 @@ struct BreakOverlayView: View {
                     if timerManager.canSkipBreak {
                         Button(action: { timerManager.skipBreak() }) {
                             HStack(spacing: 10) {
-                                Text(L10n.skip)
+                                Text(L10n.t(.skip))
                                     .font(.system(size: 15, weight: .medium))
                                     .foregroundStyle(.white.opacity(0.5))
-                                Text(L10n.skipKeys)
+                                Text(L10n.t(.skipKeys))
                                     .font(.system(size: 11, weight: .medium, design: .rounded))
                                     .foregroundStyle(.white.opacity(0.25))
                             }
@@ -141,6 +153,8 @@ struct BreakOverlayView: View {
                         }
                         .buttonStyle(.plain)
                         .opacity(appeared ? 1 : 0)
+                        .accessibilityLabel(L10n.t(.skip))
+                        .accessibilityHint(L10n.t(.skipKeys))
                         .onHover { hovering in
                             if hovering {
                                 NSCursor.pointingHand.push()
@@ -194,18 +208,6 @@ struct BreakOverlayView: View {
             withAnimation(.linear(duration: 1)) {
                 ringProgress = progress
             }
-        }
-    }
-
-}
-
-private extension View {
-    @ViewBuilder
-    func onChangeCompat<V: Equatable>(of value: V, perform action: @escaping () -> Void) -> some View {
-        if #available(macOS 14.0, *) {
-            self.onChange(of: value) { _, _ in action() }
-        } else {
-            self.onChange(of: value) { _ in action() }
         }
     }
 }

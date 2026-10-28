@@ -1,21 +1,30 @@
 name: Release
 
-# Push a tag like v1.0.4 (or run this workflow manually) to build a signed /
+# Push a tag like v1.1.0 (or run this workflow manually) to build a signed /
 # notarized (when certificates are configured) universal build and publish it as
 # a GitHub Release.
 #
-# The in-app updater looks for a release whose title matches
-# "iCanHazRepose <x.y.z>" / "iCHR <x.y.z>" and downloads the asset named
-# exactly `iCHR.zip`. Both are produced below — do not rename the assets.
+# Updates are delivered by Sparkle (see src/Updater.swift). Every release must
+# publish three things together:
+#   - `iCHR.zip`     the update archive Sparkle downloads (exact name)
+#   - `appcast.xml`  the feed, signed with the EdDSA key from Info.plist
+#   - a release title that starts with "iCanHazRepose <x.y.z>" (for humans)
+# `SUFeedURL` points at releases/latest/download/appcast.xml, so publishing a
+# release is what makes an update visible — no separate feed host.
 #
-# Optional repository secrets:
+# Repository secrets:
+#   SPARKLE_ED_PRIVATE_KEY  base64 EdDSA private key (REQUIRED — the appcast
+#                           cannot be signed without it and Sparkle rejects
+#                           unsigned entries). Generate with Sparkle's
+#                           `generate_keys`; the public half lives in
+#                           Info.plist as SUPublicEDKey.
 #   MACOS_CERT_P12          base64(.p12) with a "Developer ID Application" cert
 #   MACOS_CERT_PASSWORD     password of that .p12
 #   NOTARY_APPLE_ID         Apple ID for notarization
 #   NOTARY_TEAM_ID          10-character team id
 #   NOTARY_APP_PASSWORD     app-specific password
-# Without them the build is ad-hoc signed: it runs fine after the user clears
-# the quarantine attribute (see the release notes this workflow generates).
+# Without the certificate the build is ad-hoc signed: it runs fine after the user
+# clears the quarantine attribute (see the release notes this workflow generates).
 
 on:
   push:
@@ -155,6 +164,17 @@ jobs:
         run: |
           set -euo pipefail
           test -f dist/iCHR.zip || { echo "::error::dist/iCHR.zip missing"; exit 1; }
+          # Sparkle must be inside the bundle and reachable through the rpath,
+          # otherwise every copy except the one on the build machine fails to
+          # launch with a dyld error.
+          test -d dist/iCanHazRepose.app/Contents/Frameworks/Sparkle.framework || {
+            echo "::error::Sparkle.framework was not embedded"
+            exit 1
+          }
+          otool -L dist/iCanHazRepose.app/Contents/MacOS/iCanHazRepose | grep -q "@rpath/Sparkle.framework" || {
+            echo "::error::executable is not linked against Sparkle"
+            exit 1
+          }
           # The updater requires this exact asset name and a matching version.
           BUILT="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' \
             'dist/iCanHazRepose.app/Contents/Info.plist')"
@@ -164,6 +184,44 @@ jobs:
           }
           lipo -archs dist/iCanHazRepose.app/Contents/MacOS/iCanHazRepose
           unzip -l dist/iCHR.zip | head -10
+
+      - name: Generate appcast
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SPARKLE_ED_PRIVATE_KEY" ]; then
+            echo "::error::SPARKLE_ED_PRIVATE_KEY is not set. Sparkle refuses unsigned entries, so publishing without it would ship a release nobody can update from. Add the key as a repository secret."
+            exit 1
+          fi
+          # The tools come with the Sparkle binary artifact that SwiftPM already
+          # downloaded for the build.
+          TOOLS="$PWD/.build/artifacts/sparkle/Sparkle/bin"
+          test -x "$TOOLS/generate_appcast" || {
+            echo "::error::generate_appcast not found under .build/artifacts"
+            exit 1
+          }
+
+          mkdir -p feed
+          cp dist/iCHR.zip feed/
+          # `--ed-key-file -` keeps the private key off disk and out of argv.
+          printf '%s\n' "$SPARKLE_ED_PRIVATE_KEY" | "$TOOLS/generate_appcast" \
+            --ed-key-file - \
+            --download-url-prefix "https://github.com/$REPO/releases/download/v$VERSION/" \
+            --link "https://github.com/$REPO" \
+            feed/
+
+          test -f feed/appcast.xml || { echo "::error::appcast.xml was not generated"; exit 1; }
+          grep -q "<sparkle:version>$VERSION</sparkle:version>" feed/appcast.xml || {
+            echo "::error::appcast.xml does not advertise $VERSION"
+            sed -n '1,80p' feed/appcast.xml
+            exit 1
+          }
+          cp feed/appcast.xml dist/appcast.xml
+          echo "--- appcast.xml ---"
+          cat dist/appcast.xml
 
       - name: Generate release notes
         run: |
@@ -207,6 +265,10 @@ jobs:
           set -euo pipefail
           ASSETS=(dist/iCHR.zip)
           if [ -f dist/iCHR.dmg ]; then ASSETS+=(dist/iCHR.dmg); fi
+          # The feed lives next to the archive so `releases/latest/download/
+          # appcast.xml` always resolves to the newest published build.
+          test -f dist/appcast.xml || { echo "::error::dist/appcast.xml missing"; exit 1; }
+          ASSETS+=(dist/appcast.xml)
 
           if gh release view "v$VERSION" > /dev/null 2>&1; then
             gh release upload "v$VERSION" "${ASSETS[@]}" --clobber

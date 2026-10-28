@@ -1,4 +1,5 @@
 import AppKit
+import ICHRCore
 import SwiftUI
 
 struct CompactBreakOverlayView: View {
@@ -58,14 +59,23 @@ struct CompactBreakOverlayView: View {
                         .opacity(reduceMotion ? 1 : timerManager.graceProgress)
                         .animation(.easeOut(duration: 1), value: timerManager.graceProgress)
                 }
+                // Same treatment as the full overlay: the arc is decorative, the
+                // remaining time is the information.
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(
+                    timerManager.isLongBreak ? L10n.t(.longBreakTitle) : L10n.t(.timeToRest)
+                )
+                .accessibilityValue(
+                    L10n.t(.timeRemaining, formatTime(timerManager.remainingSeconds))
+                )
 
                 VStack(spacing: 8) {
-                    Text(timerManager.isLongBreak ? L10n.longBreakTitle : L10n.timeToRest)
+                    Text(timerManager.isLongBreak ? L10n.t(.longBreakTitle) : L10n.t(.timeToRest))
                         .font(.system(size: 24, weight: .medium, design: .rounded))
                         .foregroundStyle(.white)
                         .opacity(appeared ? 1 : 0)
 
-                    Text(timerManager.breakTip.isEmpty ? L10n.restHint : timerManager.breakTip)
+                    Text(timerManager.breakTip.isEmpty ? L10n.t(.restHint) : timerManager.breakTip)
                         .font(.system(size: 13, weight: .regular))
                         .foregroundStyle(.white.opacity(0.4))
                         .multilineTextAlignment(.center)
@@ -76,10 +86,10 @@ struct CompactBreakOverlayView: View {
                 // Escape hint (non-clickable — mouse passes through to fullscreen app)
                 if timerManager.canSkipBreak {
                     HStack(spacing: 8) {
-                        Text(L10n.skip)
+                        Text(L10n.t(.skip))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.white.opacity(0.5))
-                        Text(L10n.skipKeys)
+                        Text(L10n.t(.skipKeys))
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                             .foregroundStyle(.white.opacity(0.25))
                     }
@@ -88,9 +98,10 @@ struct CompactBreakOverlayView: View {
                     .background(.white.opacity(0.08), in: Capsule())
                     .overlay(Capsule().stroke(.white.opacity(0.1), lineWidth: 0.5))
                     .opacity(appeared ? 1 : 0)
+                    .accessibilityElement(children: .combine)
                 } else if timerManager.showsSkipHint {
                     // Escape still works; this is only a nudge.
-                    Text(L10n.skipHint)
+                    Text(L10n.t(.skipHint))
                         .font(.system(size: 11, weight: .regular))
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.white.opacity(0.3))
@@ -137,15 +148,3 @@ struct CompactBreakOverlayView: View {
         }
     }
 }
-
-private extension View {
-    @ViewBuilder
-    func onChangeCompat<V: Equatable>(of value: V, perform action: @escaping () -> Void) -> some View {
-        if #available(macOS 14.0, *) {
-            self.onChange(of: value) { _, _ in action() }
-        } else {
-            self.onChange(of: value) { _ in action() }
-        }
-    }
-}
-

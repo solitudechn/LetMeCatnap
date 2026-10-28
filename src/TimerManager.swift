@@ -1,7 +1,7 @@
-import Foundation
-import Combine
 import AppKit
+import Combine
 import CoreGraphics
+import Foundation
 import ICHRCore
 
 enum TimerState {
@@ -97,19 +97,19 @@ class TimerManager: ObservableObject {
         case .working:
             return formatTime(remainingSeconds)
         case .onBreak:
-            return L10n.breakCountdown(formatTime(remainingSeconds))
+            return L10n.t(.breakCountdown, formatTime(remainingSeconds))
         case .paused:
             switch pauseReason {
             case .meeting:
-                return L10n.meetingCountdown(formatTime(secondsBeforePause))
+                return L10n.t(.meetingCountdown, formatTime(secondsBeforePause))
             case .breakPending:
-                return L10n.meetingInProgress
+                return L10n.t(.meetingInProgress)
             case .locked:
-                return L10n.locked
+                return L10n.t(.locked)
             case .idle:
-                return L10n.idleCountdown(formatTime(secondsBeforePause))
+                return L10n.t(.idleCountdown, formatTime(secondsBeforePause))
             case .manual:
-                return L10n.pausedCountdown(formatTime(secondsBeforePause))
+                return L10n.t(.pausedCountdown, formatTime(secondsBeforePause))
             }
         }
     }
@@ -118,15 +118,16 @@ class TimerManager: ObservableObject {
         guard state == .paused else { return nil }
         switch pauseReason {
         case .meeting:
-            return meetingDetector.meetingSource.map { L10n.pausedWith($0) } ?? L10n.pausedInMeeting
+            return meetingDetector.meetingSource.map { L10n.t(.pausedWith, $0) } ?? L10n.t(.pausedInMeeting)
         case .breakPending:
-            return meetingDetector.meetingSource.map { L10n.breakPending($0) } ?? L10n.inMeetingBreakPending
+            return meetingDetector.meetingSource.map { L10n.t(.breakPending, $0) }
+                ?? L10n.t(.inMeetingBreakPending)
         case .locked:
-            return L10n.pausedLocked
+            return L10n.t(.pausedLocked)
         case .idle:
-            return L10n.pausedIdle
+            return L10n.t(.pausedIdle)
         case .manual:
-            return L10n.paused
+            return L10n.t(.paused)
         }
     }
 
@@ -265,7 +266,8 @@ class TimerManager: ObservableObject {
             pauseReason = .idle
             Log.info("Timer paused: idle for \(Int(idle))s (\(secondsBeforePause)s banked)")
         } else if state == .paused, pauseReason == .idle,
-                  TimerRules.isBackFromIdle(secondsSinceInput: idle, trigger: settings.pauseTrigger) {
+            TimerRules.isBackFromIdle(secondsSinceInput: idle, trigger: settings.pauseTrigger)
+        {
             Log.info("User is back after an idle pause — starting a full work session")
             resumeFromAutomaticPause()
         }
@@ -503,10 +505,12 @@ class TimerManager: ObservableObject {
     // MARK: - Fullscreen Detection
 
     func isFrontmostAppFullscreen() -> Bool {
-        guard let windowList = CGWindowListCopyWindowInfo(
-            [.optionOnScreenOnly, .excludeDesktopElements],
-            kCGNullWindowID
-        ) as? [[String: Any]] else { return false }
+        guard
+            let windowList = CGWindowListCopyWindowInfo(
+                [.optionOnScreenOnly, .excludeDesktopElements],
+                kCGNullWindowID
+            ) as? [[String: Any]]
+        else { return false }
 
         for window in windowList {
             let layer = window[kCGWindowLayer as String] as? Int64 ?? -1
@@ -521,8 +525,9 @@ class TimerManager: ObservableObject {
 
             for screen in NSScreen.screens {
                 let sf = screen.frame
-                if abs(w - sf.width) < 2 && abs(h - sf.height) < 2 &&
-                   abs(x - sf.minX) < 2 && abs(y - sf.minY) < 2 {
+                if abs(w - sf.width) < 2 && abs(h - sf.height) < 2 && abs(x - sf.minX) < 2
+                    && abs(y - sf.minY) < 2
+                {
                     return true
                 }
             }
@@ -553,10 +558,12 @@ class TimerManager: ObservableObject {
         // voluntary break starts would let the nudge be dodged and would also
         // lose the information that the user keeps skipping. It is cleared in
         // `endBreak()` only, i.e. once a break is actually taken.
-        isLongBreak = countWorkSession && TimerRules.isLongBreak(
-            sessionsCompleted: workSessionsCompleted,
-            every: longBreakEvery
-        )
+        isLongBreak =
+            countWorkSession
+            && TimerRules.isLongBreak(
+                sessionsCompleted: workSessionsCompleted,
+                every: longBreakEvery
+            )
         activeBreakTotalSeconds = TimerRules.breakTotalSeconds(
             isLong: isLongBreak,
             shortSeconds: settings.breakSeconds,
@@ -570,7 +577,8 @@ class TimerManager: ObservableObject {
         isBreakImminent = false
         workDeadline = nil
         breakStartTime = now
-        breakDeadline = now
+        breakDeadline =
+            now
             .addingTimeInterval(breakGracePeriod)
             .addingTimeInterval(TimeInterval(activeBreakTotalSeconds))
         nextBreakTipDate = now.addingTimeInterval(breakGracePeriod + 20)
@@ -587,7 +595,9 @@ class TimerManager: ObservableObject {
             Log.info("Break overlay triggered: full overlay (work timer expired)")
         }
 
-        Log.info("Break started: \(isLongBreak ? "long" : "short") \(activeBreakTotalSeconds)s (session #\(workSessionsCompleted), manual=\(!countWorkSession))")
+        Log.info(
+            "Break started: \(isLongBreak ? "long" : "short") \(activeBreakTotalSeconds)s (session #\(workSessionsCompleted), manual=\(!countWorkSession))"
+        )
         if !muteSounds { NSSound(named: "Glass")?.play() }
     }
 
@@ -621,7 +631,7 @@ class TimerManager: ObservableObject {
                 await MainActor.run { [weak self] in
                     self?.graceProgress = progress
                 }
-                try? await Task.sleep(nanoseconds: 50_000_000) // 50 ms
+                try? await Task.sleep(nanoseconds: 50_000_000)  // 50 ms
             }
             if !Task.isCancelled {
                 await MainActor.run { [weak self] in
