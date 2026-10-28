@@ -281,8 +281,4 @@ public final class Settings: ObservableObject {
     private static func optionalInteger(_ defaults: UserDefaults, _ key: String) -> Int? {
         (defaults.object(forKey: key) as? NSNumber)?.intValue
     }
-
-    private static func optionalDouble(_ defaults: UserDefaults, _ key: String) -> Double? {
-        (defaults.object(forKey: key) as? NSNumber)?.doubleValue
-    }
 }

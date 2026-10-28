@@ -344,7 +344,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
             if timerManager.isInMeeting {
                 statusMenuItem.title = L10n.t(.inMeeting)
             } else {
-                statusMenuItem.title = L10n.t(.nextBreakIn, formatTime(timerManager.remainingSeconds))
+                statusMenuItem.title = L10n.t(
+                    .nextBreakIn, TimerRules.formatTime(timerManager.remainingSeconds))
             }
         case .onBreak:
             statusMenuItem.title = L10n.t(.onBreak)

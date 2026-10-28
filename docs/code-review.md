@@ -6,7 +6,7 @@
 
 > **阅读提示**：本文是按轮次追加的审查日志，记录的是「当时」的结论。
 > 前几轮判定的若干问题已被后续轮次修复或推翻（已在正文用删除线标出），
-> 判断项目当前状态请看文末最新的「第十轮」与 [`docs/audit-2026-10-28.md`](audit-2026-10-28.md)。
+> 判断项目当前状态请看文末最新的「第十二轮」与 [`docs/audit-2026-10-28.md`](audit-2026-10-28.md)。
 
 ---
 
@@ -45,12 +45,17 @@
 ## 三、CI / Release 怎么用
 
 - `ci.yml`：push 到 `main` 或发 PR 时，跑 `./build.sh ci`，校验产物（版本号、架构、签名、zip 内容），把 `iCHR.zip` / `iCHR.dmg` 作为 artifact 上传（保留 14 天）。
-- `release.yml`：推 `v1.0.4` 这样的 tag（或手动触发），编译 → 打 zip/dmg → 校验版本与 tag 一致 → 自动生成中文更新说明 → 创建 Release。
+- `release.yml`：推 `v1.0.4` 这样的 tag（或手动触发），编译 → 打 zip/dmg → 校验版本与 tag 一致 → 生成并签名 `appcast.xml` → 自动生成中文更新说明 → 创建 Release。
 
-发布时有两条硬约束，改了自动更新就废：
+~~发布时有两条硬约束，改了自动更新就废：~~
 
-1. Release 标题必须形如 `iCanHazRepose 1.0.4`（或 `iCHR 1.0.4`）；
-2. 资产名必须**正好是** `iCHR.zip`（更新器按名字找）。
+1. ~~Release 标题必须形如 `iCanHazRepose 1.0.4`（或 `iCHR 1.0.4`）；~~
+2. ~~资产名必须**正好是** `iCHR.zip`（更新器按名字找）。~~
+
+> **第十轮起已作废。** 更新器换成 Sparkle 2（`src/Updater.swift`）后，标题只给人看，
+> 资产名只影响链接是否 404，两者都不参与更新判断。当前的硬约束是：
+> **`appcast.xml` 必须存在且签名有效，且与 `Info.plist` 的 `SUPublicEDKey` 配对**。
+> 详见 [`docs/releasing.md`](releasing.md)。
 
 加这 5 个仓库 secret 就能签名 + 公证，不加就是 ad-hoc 签名（用户首次打开要清隔离）：
 
@@ -64,9 +69,14 @@
 
 1. **正式签名 + 公证**。没有 Developer ID，下载用户看到的是「已损坏，无法打开」。workflow 已经预留好，拿到证书填 secret 即可。
 2. **换签名证书会让老用户断更**。更新器用 `SecStaticCodeCopyDesignatedRequirement` 比对当前包与下载包的设计要求：ad-hoc（`identifier "wtf.d7.icanhazrepose"`）切到 Developer ID 后，旧包校验新包会失败，老用户必须手动装一次新包。建议在切换的那一版 Release 说明里写清楚。
+   （第十轮起这项校验改由 Sparkle 自己做，机制与自研那套不同；结论不变：
+   **从 ad-hoc 切到 Developer ID 的那一版，仍需在发布说明里写明可能要手动安装一次**。
+   第十轮已把 1.1.0 标成「一次性手动升级」，起因是 bundle id 变更而不是证书。）
 3. ~~**版本号要和上游错开**~~。已按 `1.0.4` 首发，源码版本随发版推进（`Info.plist`）。
 4. ~~**切语言后已打开的窗口不刷新**~~（第四轮已修：`AboutViewController.reloadForLanguageChange()`，`setLanguage` 时同步刷新可见窗口）。
-5. **安装更新失败无提示**。`UpdateManager` 的安装脚本先 `rm -rf` 旧包再 `mv`，但 app 已经 `terminate` 了；若 `/Applications` 需要管理员权限，替换会静默失败，用户看到的是「app 打不开了」。建议：安装脚本失败时 `open` 一次旧路径，或改用「先写到临时目录、用 `osascript` 提权」的流程。
+5. ~~**安装更新失败无提示**。`UpdateManager` 的安装脚本先 `rm -rf` 旧包再 `mv`，但 app 已经 `terminate` 了；若 `/Applications` 需要管理员权限，替换会静默失败，用户看到的是「app 打不开了」。建议：安装脚本失败时 `open` 一次旧路径，或改用「先写到临时目录、用 `osascript` 提权」的流程。~~
+   （第十轮已随自研更新器整体删除；Sparkle 在 `/Applications` 不可写时弹管理员授权，
+   失败有自己的对话框并写日志。）
 
 ### P1 — 明显影响体验 / 可维护性
 
@@ -74,17 +84,27 @@
 7. ~~**README 与实现不一致**~~（已统一：空闲阈值固定 5 分钟，且改为可选的暂停时机）。
 8. ~~**日志只有 stdout**~~（已加 `Log.swift` 文件日志：`~/Library/Logs/iCanHazRepose/`，1 MB 滚动）。
 9. ~~**没有测试**~~（已加 `Tests/ICHRCoreTests` 与 `scripts/check-l10n.py`，两者都接进 CI）。
-10. **没有格式化/静态检查**（行尾空格已清理；CI 仍无 lint，见第八轮待办）。
-11. **bundle id 和上游相同**（`wtf.d7.icanhazrepose`）。同时装原版和汉化版会共用 `UserDefaults`、冲突「开机启动」注册（`SMAppService.mainApp` 按路径注册，容易残留）。如果希望两个版本共存，改成 `wtf.d7.icanhazrepose.zh`——代价是现有用户要重装一次。
+10. ~~**没有格式化/静态检查**（行尾空格已清理；CI 仍无 lint，见第八轮待办）。~~
+    （已有 `.swift-format` + `swift format lint --strict`，CI 与 Release 都跑。）
+11. ~~**bundle id 和上游相同**（`wtf.d7.icanhazrepose`）。同时装原版和汉化版会共用 `UserDefaults`、冲突「开机启动」注册（`SMAppService.mainApp` 按路径注册，容易残留）。如果希望两个版本共存，改成 `wtf.d7.icanhazrepose.zh`——代价是现有用户要重装一次。~~
+    （已改为 `io.github.solitudechn.icanhazrepose` 并带偏好迁移，见第十轮。）
 12. **本地化方案的天花板**。现在是 `L10n.swift` 里硬编码两种语言，加第三种语言要改代码、且不能交给社区翻译。中期建议迁到 `Resources/<lang>.lproj/Localizable.strings` + `NSLocalizedString`，`build.sh` 里补一句 `cp -R res/lproj/*.lproj` 即可。
+    **第十轮已部分解决**：字符串表迁进 `ICHRCore`，键是 `LocKey` 枚举、值是成对的
+    `Translation`，加第三语言只需改 `Translation` 与查表逻辑，调用点不用动。
+    仍留在代码里而不是 `.lproj`，理由见 `core/L10n.swift` 顶部注释
+    （手工拼 `.app` 的构建方式下，`.lproj` 收益不抵成本）。
 
 ### P2 — 锦上添花
 
 13. 用 Homebrew Cask 分发（`brew install --cask`），要开一个 tap。
-14. 长期看建议换 **Sparkle 2**：签名校验、增量更新、进度条、beta 渠道都是现成的，比自研这套（约 490 行 + 安装脚本）更省心。自研的好处是零依赖、体积小。
-15. 下载更新时加进度提示（现在只有「正在更新」和最终的失败弹窗）。
-16. 关于窗口加一行「简体中文汉化：solitudechn」，符合 MIT 的署名习惯，也方便用户反馈到你的仓库。
-17. `.roorules` 是上游给 AI 编码助手看的项目说明，保留没问题，建议在文件头注明来自上游。
+14. ~~长期看建议换 **Sparkle 2**：签名校验、增量更新、进度条、beta 渠道都是现成的，比自研这套（约 490 行 + 安装脚本）更省心。自研的好处是零依赖、体积小。~~
+    （第十轮已换成 Sparkle 2.10.1。）
+15. ~~下载更新时加进度提示（现在只有「正在更新」和最终的失败弹窗）。~~
+    （Sparkle 自带下载进度；自研的下载流程已删除。）
+16. ~~关于窗口加一行「简体中文汉化：solitudechn」，符合 MIT 的署名习惯，也方便用户反馈到你的仓库。~~
+    （已加，并把指向上游的 Ko-fi / Discord / Reddit 一并移除。）
+17. ~~`.roorules` 是上游给 AI 编码助手看的项目说明，保留没问题，建议在文件头注明来自上游。~~
+    （已按现结构重写，见第十、十二轮。）
 
 ---
 
@@ -178,9 +198,13 @@
 
 逐行审完 `build.sh`、`ci.yml`、`release.yml`，并结合仓库文件清单核对：
 
-- 资源完整：`res/main.icns`、`res/ui/*.png`（4 个图标）、`res/dmg/bg*.png`、`assets/*`（README 引用）全部存在；`build.sh` 复制的文件与实际文件一一对应。
-- 步骤计数正确：`ci`/`release` 基础 9 步，签名 +1、公证 +3、验签 +1，与实际执行顺序一致（`set -euo pipefail` 下无漏步）。
-- 发版硬约束成立：Release 标题 `iCanHazRepose x.y.z`、资产 `iCHR.zip`（+`iCHR.dmg` 可选），`Verify artifacts` 会比对 `CFBundleVersion` 与 tag，`Publish` 对已存在的 tag 走 `--clobber` 上传。
+- 资源完整：`res/main.icns`、`res/ui/*.png`（当时 4 个图标，第十一轮删到 1 个）、`res/dmg/bg*.png`、`assets/*`（README 引用）全部存在；`build.sh` 复制的文件与实际文件一一对应。
+- 步骤计数正确：当时 `ci`/`release` 基础 9 步，签名 +1、公证 +3、验签 +1。
+  （第十轮加入「Embedding Sparkle framework」后基础变成 10 步；第十二轮发现
+  `ci` 模式下「验签」的计数条件比实际执行条件宽，无证书时进度会停在 `12/13`，已修。）
+- ~~发版硬约束成立：Release 标题 `iCanHazRepose x.y.z`、资产 `iCHR.zip`（+`iCHR.dmg` 可选），`Verify artifacts` 会比对 `CFBundleVersion` 与 tag，`Publish` 对已存在的 tag 走 `--clobber` 上传。~~
+  （标题与资产名的「硬约束」随 Sparkle 作废；`Verify artifacts` 的版本比对仍然有效，
+  现在的硬约束是签名的 `appcast.xml`。）
 - `.gitignore` 覆盖 `dist/`、`.build/`、`*.log`、`.env`、`.workbuddy/`；工作区无残留产物。
 - 统一了更新弹窗标题：关于窗口改用 `L10n.softwareUpdate`（原为「发现更新」，与菜单侧「软件更新」不一致），删除随之不再使用的 `updateAvailable` 键。
 
@@ -385,3 +409,42 @@ x86_64 会覆盖先跑的 arm64——`lipo` 直接报 "no eligible inputs"。
 把键盘路径和按钮路径分开；设置项改名「显示跳过按钮 / Show Skip Button」（存储键不变，
 老用户的选择不丢）；按钮隐藏时两张遮罩都提示「按 Esc 退出」。
 同一轮还删掉了关于窗口里指向上游的 Ko-fi / Discord / Reddit 入口。
+
+---
+
+## 第十二轮：逐文件复审（2026-10-28 中午）
+
+前两轮是「按主题查」，这轮把 47 个受控文件**逐个**通读了一遍，包含 README、`.roorules`、
+`.env.example`、两个工作流和全部文档。14 处已修，另有 1 项结构性问题待拍板；完整清单见
+[`docs/audit-2026-10-28.md`](audit-2026-10-28.md) 第九节。
+
+### 真问题（不只是整洁）
+
+1. **`formatTime` 有两层实现**。`src/TimerManager.swift` 底部有个全局函数，函数体只有一句
+   `TimerRules.formatTime(seconds)`，15 个调用点全走它。今天它只是转发，但这种结构最容易
+   在半年后变成「两处各改一半」。已删除，调用点直接调 `TimerRules.formatTime`。
+2. **一条恒真的测试**。`testTranslationFallsBackToKeyName` 比较的是
+   `L10n.translation(k).value(for:)` 与 `L10n.text(k, for:)`，而后者就是前者的包装——
+   它永远绿，永远抓不到东西，却占着「这条路径测过了」的位置。已换成真正断言
+   `Translation.value(for:)` 与占位符计数（`%ld` / `%d` / `%@` / 字面 `%`）。
+3. **两处注释在说假话**。`TimerManager` 的 `screenLockedProvider` /
+   `secondsSinceInputProvider` 写着「Overridable so tests do not depend on…」，
+   但 `TimerManager` 在 AppKit target 里，测试 bundle 根本 import 不了它，
+   没有一处测试用过这两个注入点。注释已改成如实描述，并把「状态机零测试」作为 P1
+   单独记在审计报告里。
+4. **`build.sh` 的 `ci` 步骤计数比实际执行宽**：验签步骤只在「有证书**且**已公证」时执行，
+   计数只看了证书，配了证书没公证时进度会停在 `12/13`。
+5. **`release.yml` 没有 lint**。`ci.yml` 有，但发布是唯一面向用户的构建 —— 一个格式不合规的
+   提交可以一路发到用户手里。已补上（带旧工具链探测）。
+
+### 文档
+
+`code-review.md` 自己就是重灾区：§三 的「资产名必须正好是 `iCHR.zip`」、§四 的 7 条待办、
+§五 的「步骤计数正确 / 4 个图标」都已被推翻却仍以肯定语气写着。这轮全部加了删除线和去向。
+README 首页的「maintained by deseven」也改了 —— 在一个 fork 里，这句话读起来像「本项目由
+deseven 维护」。
+
+### 还没做
+
+`TimerManager` 没有自动化测试，这是全项目最该补的一块，但它需要先把决策逻辑从 AppKit 里
+拆出来（审计报告 9.2 给了两条路线）。发第一个 Sparkle 版本之前不动结构。

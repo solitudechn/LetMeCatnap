@@ -78,7 +78,7 @@ struct BreakOverlayView: View {
                             .scaleEffect(breathe ? 1.05 : 0.97)
 
                         // Timer inside the ring
-                        Text(formatTime(timerManager.remainingSeconds))
+                        Text(TimerRules.formatTime(timerManager.remainingSeconds))
                             .font(.system(size: 38, weight: .light, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.9))
                             .contentTransition(.numericText())
@@ -99,7 +99,7 @@ struct BreakOverlayView: View {
                         timerManager.isLongBreak ? L10n.t(.longBreakTitle) : L10n.t(.timeToRest)
                     )
                     .accessibilityValue(
-                        L10n.t(.timeRemaining, formatTime(timerManager.remainingSeconds))
+                        L10n.t(.timeRemaining, TimerRules.formatTime(timerManager.remainingSeconds))
                     )
                     .accessibilityHint(L10n.t(.showRemaining))
                     .accessibilityAddTraits(.isButton)

@@ -463,25 +463,29 @@ case "$mode" in
     release)
         totalSteps=10
         if [ "$can_sign" = true ]; then
-            totalSteps=$((totalSteps + 1))
+            totalSteps=$((totalSteps + 1))  # sign the DMG
         fi
         if [ "$can_notarize" = true ]; then
-            totalSteps=$((totalSteps + 3))
+            totalSteps=$((totalSteps + 3))  # notarize + staple app + staple DMG
         fi
         if [ "$can_sign" = true ]; then
-            totalSteps=$((totalSteps + 1))
+            # `release` always runs `spctl`, so a certificate is enough here.
+            totalSteps=$((totalSteps + 1))  # verify signatures
         fi
         ;;
     ci)
+        # `ci` builds the same artifacts as `release`, but `spctl` only passes
+        # for a notarized build, so the verification step needs both a
+        # certificate and notarization. Counting it on `can_sign` alone made the
+        # progress line stop at "12/13" — a step count that never adds up is the
+        # kind of detail that makes people distrust the whole output.
         totalSteps=10
         if [ "$can_sign" = true ]; then
-            totalSteps=$((totalSteps + 1))
+            totalSteps=$((totalSteps + 1))  # sign the DMG
         fi
         if [ "$can_notarize" = true ]; then
-            totalSteps=$((totalSteps + 3))
-        fi
-        if [ "$can_sign" = true ]; then
-            totalSteps=$((totalSteps + 1))
+            totalSteps=$((totalSteps + 3))  # notarize + staple app + staple DMG
+            totalSteps=$((totalSteps + 1))  # verify signatures
         fi
         ;;
 esac

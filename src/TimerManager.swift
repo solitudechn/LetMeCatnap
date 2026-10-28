@@ -99,21 +99,21 @@ class TimerManager: ObservableObject {
     var menuBarText: String {
         switch state {
         case .working:
-            return formatTime(remainingSeconds)
+            return TimerRules.formatTime(remainingSeconds)
         case .onBreak:
-            return L10n.t(.breakCountdown, formatTime(remainingSeconds))
+            return L10n.t(.breakCountdown, TimerRules.formatTime(remainingSeconds))
         case .paused:
             switch pauseReason {
             case .meeting:
-                return L10n.t(.meetingCountdown, formatTime(secondsBeforePause))
+                return L10n.t(.meetingCountdown, TimerRules.formatTime(secondsBeforePause))
             case .breakPending:
                 return L10n.t(.meetingInProgress)
             case .locked:
                 return L10n.t(.locked)
             case .idle:
-                return L10n.t(.idleCountdown, formatTime(secondsBeforePause))
+                return L10n.t(.idleCountdown, TimerRules.formatTime(secondsBeforePause))
             case .manual:
-                return L10n.t(.pausedCountdown, formatTime(secondsBeforePause))
+                return L10n.t(.pausedCountdown, TimerRules.formatTime(secondsBeforePause))
             }
         }
     }
@@ -210,8 +210,13 @@ class TimerManager: ObservableObject {
         }
     }
 
-    /// Whether the session is locked. Overridable so tests do not depend on
-    /// the machine's real lock state.
+    /// Whether the session is locked.
+    ///
+    /// The decision itself lives in `TimerRules` and is unit-tested; this hook
+    /// exists so the state machine can be exercised without really locking the
+    /// screen. `TimerManager` sits in the AppKit target, so it has no automated
+    /// tests of its own — see the “no tests for the state machine” item in
+    /// `docs/audit-2026-10-28.md`.
     var screenLockedProvider: () -> Bool = { TimerManager.sessionIsLocked() }
 
     static func sessionIsLocked() -> Bool {
@@ -243,8 +248,9 @@ class TimerManager: ObservableObject {
 
     // MARK: - Idle (opt-in alternative to the lock screen)
 
-    /// Seconds since the last keyboard or mouse event. Overridable so the idle
-    /// rules can be verified without waiting for real input.
+    /// Seconds since the last keyboard or mouse event. Same idea as
+    /// `screenLockedProvider`: the threshold rules live in (and are tested via)
+    /// `TimerRules`, this hook only feeds them.
     var secondsSinceInputProvider: () -> TimeInterval = {
         // `~0` is the documented way to ask for "any event type" here; the
         // initializer only fails for values that fit in the raw type, so the
@@ -684,8 +690,4 @@ class TimerManager: ObservableObject {
             }
         }
     }
-}
-
-func formatTime(_ seconds: Int) -> String {
-    TimerRules.formatTime(seconds)
 }

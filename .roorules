@@ -41,6 +41,11 @@ Rules of thumb:
   without a way out.
 - Timer state lives in `TimerManager`; anything that pauses or resumes it should go through its
   helpers rather than mutating `state` from the outside.
+- `TimerManager` has **no automated tests** — it sits in the AppKit target, which the test bundle
+  cannot import. So every *decision* it makes belongs in `ICHRCore` where `TimerRules` can cover
+  it: that is why `isImminent`, `showsSkipHint`, `shouldPauseForIdle` and `isLongBreak` live
+  there. Never re-implement a rule inside `src/` "just this once" — round 11 found exactly that
+  (`TimerManager` had its own copy of `showsSkipHint`, so the test was checking dead code).
 - The bundle identifier has exactly one source: `Info.plist`. `build.sh` reads it for the
   ad-hoc signing requirement, `core/BundleIdentity.swift` mirrors it, and
   `BundleIdentityTests` fails if the two drift apart.

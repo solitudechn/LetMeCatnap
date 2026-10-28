@@ -124,6 +124,7 @@ identifier 变了（`wtf.d7.icanhazrepose` → `io.github.solitudechn.icanhazrep
 | 现象 | 原因 |
 |---|---|
 | 更新提示「无法验证更新」 | `appcast.xml` 没签名，或私钥与 `SUPublicEDKey` 不配对 |
+| 从 ad-hoc 版升到 Developer ID 版时更新被拒 | 签名身份变了，Sparkle 不接受换了身份的包。这一版必须在发布说明里写「请手动安装一次」，装完即恢复自动更新 |
 | `releases/latest/download/appcast.xml` 404 | 最新 release 没上传 `appcast.xml`（检查 Release 工作流是否跳过） |
 | 装完新版本又提示更新 | `CFBundleVersion` 没随 tag 变化（工作流会用 tag 覆盖，本地包则看 Info.plist） |
 | 启动即崩、报 dyld 找不到 Sparkle | `build.sh` 的嵌入步骤被跳过，或 rpath 丢了 |

@@ -44,11 +44,6 @@ final class Updater: NSObject, SPUUpdaterDelegate {
         }
     }
 
-    /// `true` while Sparkle is not already busy with a check or an install.
-    var canCheckForUpdates: Bool {
-        controller?.updater.canCheckForUpdates ?? false
-    }
-
     /// Menu / About-window action. Sparkle brings its own UI.
     @objc func checkForUpdates(_ sender: Any?) {
         Log.info("update check requested by user")

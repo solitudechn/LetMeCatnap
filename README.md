@@ -21,18 +21,19 @@
 
 <div align="center">
   <a href="https://github.com/fikrikarim/repose">originally created by Fikri Karim</a> ·
-  <a href="https://github.com/deseven/iCanHazRepose">maintained by deseven</a> ·
+  <a href="https://github.com/deseven/iCanHazRepose">upstream maintained by deseven</a> ·
   <a href="https://github.com/solitudechn/iCanHazRepose">简体中文 fork</a>
 </div>
 
 <br/>
 
-> **This is a fork.** It adds an English / 简体中文 UI on top of
+> **This is a fork.** It adds an English / 简体中文 UI and a few deliberate
+> behaviour changes on top of
 > [deseven/iCanHazRepose](https://github.com/deseven/iCanHazRepose), ships under
 > its own bundle identifier (`io.github.solitudechn.icanhazrepose`) and its own
 > signed update feed, so it installs next to the original instead of replacing
-> it. For anything that is not about the localization, please use the upstream
-> repository.
+> it. Bug reports for *this* build — the localization, the changed behaviours,
+> the updater — belong here; questions about the original belong upstream.
 
 <br/>
 
@@ -131,7 +132,7 @@ Timing rules, settings and the string table live in the `ICHRCore` module so the
 can be tested without AppKit:
 
 ```
-./scripts/verify.sh                 # format lint + copy check + unit tests
+./scripts/verify.sh                 # format lint + copy check + unit tests + shell syntax
 ```
 
 Individually:

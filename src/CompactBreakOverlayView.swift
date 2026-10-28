@@ -52,7 +52,7 @@ struct CompactBreakOverlayView: View {
                         .scaleEffect(breathe ? 1.04 : 0.97)
 
                     // Timer inside the ring
-                    Text(formatTime(timerManager.remainingSeconds))
+                    Text(TimerRules.formatTime(timerManager.remainingSeconds))
                         .font(.system(size: 30, weight: .light, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.9))
                         .contentTransition(.numericText())
@@ -66,7 +66,7 @@ struct CompactBreakOverlayView: View {
                     timerManager.isLongBreak ? L10n.t(.longBreakTitle) : L10n.t(.timeToRest)
                 )
                 .accessibilityValue(
-                    L10n.t(.timeRemaining, formatTime(timerManager.remainingSeconds))
+                    L10n.t(.timeRemaining, TimerRules.formatTime(timerManager.remainingSeconds))
                 )
 
                 VStack(spacing: 8) {

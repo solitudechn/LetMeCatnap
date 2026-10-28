@@ -85,10 +85,24 @@ final class StringTableTests: XCTestCase {
         XCTAssertEqual(preset, "每 4 轮 · 15 分钟")
     }
 
-    func testTranslationFallsBackToKeyName() {
-        // Not reachable through the typed API, but the fallback keeps a missing
-        // table entry visible in the UI instead of crashing.
-        XCTAssertEqual(L10n.translation(.welcome).value(for: .english), L10n.text(.welcome, for: .english))
+    func testTranslationPicksTheRequestedLanguage() {
+        let pair = Translation("Skip", "跳过")
+        XCTAssertEqual(pair.value(for: .english), "Skip")
+        XCTAssertEqual(pair.value(for: .chinese), "跳过")
+        // `L10n.current` resolves `.system` before anyone asks for a string, so
+        // this is only a safety net — it must fall back to English, not trap.
+        XCTAssertEqual(pair.value(for: .system), "Skip")
+    }
+
+    func testPlaceholderCountingHandlesEverySpecifierInUse() {
+        XCTAssertEqual(Translation("%ld min", "%ld 分钟").placeholderCount, 1)
+        XCTAssertEqual(Translation("%d min", "%d 分钟").placeholderCount, 1)
+        XCTAssertEqual(Translation("%@ of %@", "%@ / %@").placeholderCount, 2)
+        XCTAssertEqual(Translation("%@ — %@", "%@ — %@").placeholderCount, 2)
+        XCTAssertEqual(Translation("no slots", "无占位符").placeholderCount, 0)
+        // A literal percent followed by a letter must not count as a placeholder,
+        // otherwise a translation may look mismatched when it is fine.
+        XCTAssertEqual(Translation("100% sure", "100% 确定").placeholderCount, 0)
     }
 }
 

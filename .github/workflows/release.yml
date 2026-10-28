@@ -136,6 +136,17 @@ jobs:
       - name: Check localization
         run: python3 scripts/check-l10n.py
 
+      - name: Check formatting
+        # A release is the one build that reaches users, so it gets the same
+        # style gate as CI. `swift format` only exists from Xcode 16 on, hence
+        # the probe — a missing subcommand must not fail the release.
+        run: |
+          if ! swift format --version > /dev/null 2>&1; then
+            echo "::warning::swift format is not available in this toolchain; skipping the style check"
+            exit 0
+          fi
+          swift format lint --recursive --strict src core Tests
+
       - name: Install create-dmg
         run: brew install create-dmg
 

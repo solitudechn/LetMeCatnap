@@ -1,4 +1,5 @@
 import Foundation
+import ICHRCore
 
 /// App logger: console output (debug builds) plus a rotating file log.
 ///
@@ -7,7 +8,7 @@ import Foundation
 /// serialized on a private queue and the file is rotated to `iCanHazRepose.1.log`
 /// once it passes `maxFileSize`, so it can never grow without bound.
 enum Log {
-    private static let queue = DispatchQueue(label: "wtf.d7.icanhazrepose.log")
+    private static let queue = DispatchQueue(label: "\(BundleIdentity.identifier).log")
     private static let maxFileSize = 1_000_000  // ~1 MB, roughly a month of use
     private static let folderName = "iCanHazRepose"
 
