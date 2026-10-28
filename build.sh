@@ -311,6 +311,15 @@ do_codesign() {
             echo "signing nested: $nested"
             sign_code "$nested" "no"
         done < <(find "$frameworks" -depth -type d \( -name "*.app" -o -name "*.xpc" \) -print0)
+        # `Autoupdate` is a bare executable, not a bundle, so the loop above misses
+        # it. Leaving it signed by Sparkle's own team breaks notarization ("not
+        # signed with a valid Developer ID certificate") the first time a real
+        # certificate is configured.
+        local autoupdate="$frameworks/Sparkle.framework/Versions/B/Autoupdate"
+        if [ -x "$autoupdate" ]; then
+            echo "signing nested: $autoupdate"
+            sign_code "$autoupdate" "no"
+        fi
         sign_code "$frameworks/Sparkle.framework" "no"
     fi
 

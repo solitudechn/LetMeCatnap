@@ -46,8 +46,15 @@ jobs:
 
       - name: Check formatting
         # Style is enforced rather than hand-maintained; config in .swift-format.
-        # `--strict` turns would-be warnings into a failing exit code.
-        run: swift format lint --recursive --strict src core Tests
+        # `--strict` turns would-be warnings into a failing exit code. `swift format`
+        # only exists from Xcode 16 on, so an older runner skips instead of failing
+        # the whole build over a missing subcommand.
+        run: |
+          if ! swift format --version > /dev/null 2>&1; then
+            echo "::warning::swift format is not available in this toolchain; skipping the style check"
+            exit 0
+          fi
+          swift format lint --recursive --strict src core Tests
 
       - name: Check localization
         run: python3 scripts/check-l10n.py
