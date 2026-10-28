@@ -42,6 +42,30 @@ Sparkle 自带 `generate_keys`，也可以用任意 Ed25519 实现生成一对 3
 
 两者必须成对。**换了公钥就等于换了更新身份**：旧版本校验不过新包，用户只能手动重装。
 
+### 首次配置仓库 secret（只需一次）
+
+```sh
+cat ~/.config/icanhazrepose/sparkle_ed25519_private.key | pbcopy
+```
+
+然后打开 `Settings → Secrets and variables → Actions → New repository secret`，
+名称填 `SPARKLE_ED_PRIVATE_KEY`，粘贴、保存。配好之后每次发版都不再需要人工介入。
+
+**不要**把私钥提交进仓库：能读到它的人可以签一个恶意更新包，所有装了本应用的机器
+都会静默接受并运行（等于远程代码执行）。secret 是只写不可读的，CI 能用、谁取不回来。
+
+本机自检（换密钥或改签名逻辑后跑一次，至少确认能生成带 `sparkle:edSignature` 的 feed）：
+
+```sh
+mkdir -p /tmp/feedtest && cp dist/iCHR.zip /tmp/feedtest/
+cat ~/.config/icanhazrepose/sparkle_ed25519_private.key \
+  | .build/artifacts/sparkle/Sparkle/bin/generate_appcast --ed-key-file - /tmp/feedtest
+grep edSignature /tmp/feedtest/appcast.xml
+```
+
+公私钥是否配对，最终由客户端说了算：签名不匹配时 Sparkle 会拒绝安装并提示
+「无法验证更新」——出现这个提示，先查 secret 里的私钥和 `SUPublicEDKey` 是不是同一对。
+
 ### appcast 为什么能只放一版
 
 每次发布在空目录里用当次的 `iCHR.zip` 重新生成 appcast，只含最新一版。
