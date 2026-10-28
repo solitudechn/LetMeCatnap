@@ -29,6 +29,19 @@ public enum TimerRules {
     /// idle pause is lifted.
     public static let idleReturnSeconds: TimeInterval = 5
 
+    /// The app ticks every second, but meeting detection and the idle query are
+    /// system calls that are throttled to this interval.
+    public static let pollIntervalSeconds = 5
+
+    /// Whether this tick is the one that runs the throttled polls.
+    ///
+    /// Lives here rather than in `TimerManager` because it is a rule, not
+    /// plumbing: `tickCount % 50` would silently make idle detection ten times
+    /// slower while every state-machine test still passed.
+    public static func shouldPoll(tickCount: Int) -> Bool {
+        tickCount > 0 && tickCount % pollIntervalSeconds == 0
+    }
+
     public static func clamp(_ value: Int, to range: ClosedRange<Int>) -> Int {
         Swift.min(Swift.max(value, range.lowerBound), range.upperBound)
     }

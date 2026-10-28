@@ -136,4 +136,23 @@ final class TimerRulesTests: XCTestCase {
             accuracy: 0.001
         )
     }
+
+    func testPollThrottle() {
+        // Tick 0 never happens (the counter is incremented before the check),
+        // and a zero tick must not poll anyway.
+        XCTAssertFalse(TimerRules.shouldPoll(tickCount: 0))
+        XCTAssertFalse(TimerRules.shouldPoll(tickCount: 1))
+        XCTAssertFalse(TimerRules.shouldPoll(tickCount: 4))
+        XCTAssertTrue(TimerRules.shouldPoll(tickCount: 5))
+        XCTAssertFalse(TimerRules.shouldPoll(tickCount: 6))
+        XCTAssertTrue(TimerRules.shouldPoll(tickCount: 10))
+        XCTAssertTrue(TimerRules.shouldPoll(tickCount: 55))
+    }
+
+    func testPollIntervalIsFiveSeconds() {
+        // The idle query and the meeting check are system calls; pinning the
+        // interval keeps a future "make it cheaper" edit from quietly turning
+        // idle detection into a once-a-minute affair.
+        XCTAssertEqual(TimerRules.pollIntervalSeconds, 5)
+    }
 }

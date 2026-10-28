@@ -344,8 +344,7 @@ class TimerManager: ObservableObject {
     private func tick() {
         tickCount += 1
 
-        // Check for meetings every 5 seconds
-        if tickCount % 5 == 0 {
+        if TimerRules.shouldPoll(tickCount: tickCount) {
             if pauseDuringMeetings { checkMeetingStatus() }
             checkIdleStatus()
         }
