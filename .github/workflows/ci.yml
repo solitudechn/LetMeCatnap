@@ -39,6 +39,14 @@ jobs:
           swift --version
           sw_vers
 
+      - name: Run core tests
+        # Pure-logic tests for timing rules and settings; they need XCTest,
+        # which only ships with a full Xcode (selected above).
+        run: swift test --filter ICHRCoreTests
+
+      - name: Check localization
+        run: python3 scripts/check-l10n.py
+
       - name: Install create-dmg
         run: brew install create-dmg
 

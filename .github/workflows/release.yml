@@ -121,6 +121,12 @@ jobs:
             --password "$NOTARY_APP_PASSWORD"
           echo "ICHR_NOTARY_PROFILE=ichr-ci" >> "$GITHUB_ENV"
 
+      - name: Run core tests
+        run: swift test --filter ICHRCoreTests
+
+      - name: Check localization
+        run: python3 scripts/check-l10n.py
+
       - name: Install create-dmg
         run: brew install create-dmg
 
