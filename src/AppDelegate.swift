@@ -709,7 +709,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         let window = NSWindow(contentViewController: aboutVC)
         window.styleMask = [.titled, .closable, .resizable]
         window.title = L10n.t(.aboutFormat, AppConstants.appName)
-        window.setContentSize(NSSize(width: 700, height: 520))
+        // Tall enough for the five credit sections plus the icon: at 520 the
+        // left column ended three points above the bottom edge, so any font
+        // metric that differs slightly would clip the last line.
+        window.setContentSize(NSSize(width: 700, height: 560))
         window.isReleasedWhenClosed = false
         // A menu bar app must not greet you with a window it did not ask for.
         // Without this, macOS restores the About window on the next launch

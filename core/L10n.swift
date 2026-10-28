@@ -127,6 +127,8 @@ public enum LocKey: String, CaseIterable, Sendable {
     case createdBy
     case upstreamBy
     case originalCodeBy
+    case appIconBy
+    case appIconCredit
     case iconsBy
     case licenseUnavailable
 

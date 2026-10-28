@@ -100,7 +100,12 @@ enum StringTable {
         .createdBy: Translation("Author", "作者"),
         .upstreamBy: Translation("Upstream author", "上游作者"),
         .originalCodeBy: Translation("Original code", "原始代码"),
-        .iconsBy: Translation("Icons", "图标"),
+        // The app icon is the artwork this project ships; the boxicons line
+        // below covers the small glyphs inside the UI, and saying just "Icons"
+        // read as if the app icon were boxicons' work too.
+        .appIconBy: Translation("App icon", "应用图标"),
+        .appIconCredit: Translation("solitudechn (AI-generated)", "solitudechn（AI 生成）"),
+        .iconsBy: Translation("Interface icons", "界面图标"),
         .licenseUnavailable: Translation("License text not available.", "许可证文本不可用。"),
 
         // ── Main menu (only visible while the About window is open) ──

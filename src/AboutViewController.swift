@@ -173,7 +173,23 @@ class AboutViewController: NSViewController {
 
         let fikriLink = LinkButton(title: "Fikri Karim", url: AppConstants.originalRepoURL)
 
-        // "icons by" section
+        // "App icon" section — the artwork the app ships with. It is not a
+        // boxicons glyph, and the line below used to say just "Icons", which
+        // read as if it were.
+        let appIconByLabel = NSTextField(labelWithString: L10n.t(.appIconBy))
+        appIconByLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .bold)
+        appIconByLabel.textColor = .secondaryLabelColor
+        appIconByLabel.alignment = .center
+        appIconByLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let appIconCreditLabel = NSTextField(labelWithString: L10n.t(.appIconCredit))
+        appIconCreditLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        appIconCreditLabel.textColor = .labelColor
+        appIconCreditLabel.alignment = .center
+        appIconCreditLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        // "Interface icons" section — the small glyphs drawn inside the UI
+        // (currently just the GitHub mark on the button below).
         let iconsByLabel = NSTextField(labelWithString: L10n.t(.iconsBy))
         iconsByLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .bold)
         iconsByLabel.textColor = .secondaryLabelColor
@@ -199,6 +215,7 @@ class AboutViewController: NSViewController {
             createdByLabel, authorLink,
             upstreamByLabel, desevenLink,
             originalCodeByLabel, fikriLink,
+            appIconByLabel, appIconCreditLabel,
             iconsByLabel, boxiconsLink,
             socialStack,
         ]
@@ -255,8 +272,18 @@ class AboutViewController: NSViewController {
             fikriLink.topAnchor.constraint(equalTo: originalCodeByLabel.bottomAnchor, constant: tightGap),
             fikriLink.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
-            // "Icons"
-            iconsByLabel.topAnchor.constraint(equalTo: fikriLink.bottomAnchor, constant: sectionGap),
+            // "App icon"
+            appIconByLabel.topAnchor.constraint(equalTo: fikriLink.bottomAnchor, constant: sectionGap),
+            appIconByLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
+
+            // app icon credit
+            appIconCreditLabel.topAnchor.constraint(
+                equalTo: appIconByLabel.bottomAnchor, constant: tightGap),
+            appIconCreditLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
+
+            // "Interface icons"
+            iconsByLabel.topAnchor.constraint(
+                equalTo: appIconCreditLabel.bottomAnchor, constant: sectionGap),
             iconsByLabel.centerXAnchor.constraint(equalTo: leftPanel.centerXAnchor),
 
             // boxicons link
