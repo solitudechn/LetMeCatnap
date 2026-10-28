@@ -2,6 +2,11 @@
 
 基线：`55b88bb`（= 上游最新）+ `iCanHazRepose-zh-localization.patch`
 审查范围：`src/` 全部源码、`build.sh`、`Info.plist`、`README.md`
+（后续轮次已扩展到 `core/`、`Tests/`、`scripts/`、`.github/`）
+
+> **阅读提示**：本文是按轮次追加的审查日志，记录的是「当时」的结论。
+> 前几轮判定的若干问题已被后续轮次修复或推翻（已在正文用删除线标出），
+> 判断项目当前状态请看文末最新的「第九轮」与 [`docs/audit-2026-10-28.md`](audit-2026-10-28.md)。
 
 ---
 
@@ -32,8 +37,8 @@
 | 8 | `GitHubRelease.parsedVersion` 只认 release 标题 | 标题不合约定时永远检测不到更新 | 标题解析失败时回退解析 `tag_name`（`v1.0.4`） |
 | 9 | README 首页下载按钮、issue 链接、源码 clone 地址都指向上游 | 用户点下载拿到的是英文版 | 指向 fork，保留上游署名与 upstream 说明；补充 Gatekeeper 去隔离命令、发版流程说明 |
 
-已验证的部分：`build.sh` 语法检查通过；用桩程序把 `ci` 模式完整跑通（9 步全绿、版本注入生效、zip 里就是 `iCanHazRepose.app`、无 tty 时输出正常回退、无 `create-dmg` 时优雅跳过）。
-**Swift 代码未能在本机编译**：这台机器只有 Command Line Tools，没有完整 Xcode，SwiftUI 宏插件（`SwiftUIMacros`）加载不了。第一次 push 后请以 CI 的编译结果为准。
+已验证的部分：`build.sh` 语法检查通过；用桩程序把 `ci` 模式完整跑通（9 步全绿、版本注入生效、zip 里就是 `iCanHazRepose.app`、无 tty 时输出正常回退、无 `create-dmg` 时跳过 DMG（第八轮改为回退 `hdiutil`，保证 DMG 一定产出））。
+**Swift 代码未能在本机编译**：这台机器只有 Command Line Tools，没有完整 Xcode，SwiftUI 宏插件（`SwiftUIMacros`）加载不了，第一次 push 时以 CI 结果为准。~~（第八轮装上 Xcode 后已在本机全量编译并通过测试，见文末。）~~
 
 ---
 
@@ -59,17 +64,17 @@
 
 1. **正式签名 + 公证**。没有 Developer ID，下载用户看到的是「已损坏，无法打开」。workflow 已经预留好，拿到证书填 secret 即可。
 2. **换签名证书会让老用户断更**。更新器用 `SecStaticCodeCopyDesignatedRequirement` 比对当前包与下载包的设计要求：ad-hoc（`identifier "wtf.d7.icanhazrepose"`）切到 Developer ID 后，旧包校验新包会失败，老用户必须手动装一次新包。建议在切换的那一版 Release 说明里写清楚。
-3. **版本号要和上游错开**。fork 首发建议直接 `1.0.4`，别沿用 `1.0.3`——否则用户和更新器都无法区分「汉化版」和「原版」。
-4. **切语言后已打开的窗口不刷新**。`AboutViewController` 在 `setLanguage` 之后仍显示旧语言（遮罩类窗口都是弹出即建，问题不大）。建议给 `L10n` 加一个 `NotificationCenter` 广播，About 窗口监听后重新构建视图。
+3. ~~**版本号要和上游错开**~~。已按 `1.0.4` 首发，源码版本随发版推进（`Info.plist`）。
+4. ~~**切语言后已打开的窗口不刷新**~~（第四轮已修：`AboutViewController.reloadForLanguageChange()`，`setLanguage` 时同步刷新可见窗口）。
 5. **安装更新失败无提示**。`UpdateManager` 的安装脚本先 `rm -rf` 旧包再 `mv`，但 app 已经 `terminate` 了；若 `/Applications` 需要管理员权限，替换会静默失败，用户看到的是「app 打不开了」。建议：安装脚本失败时 `open` 一次旧路径，或改用「先写到临时目录、用 `osascript` 提权」的流程。
 
 ### P1 — 明显影响体验 / 可维护性
 
-6. **计时器有累积漂移**。`TimerManager.tick()` 是每秒 `remainingSeconds -= 1`，Timer 被系统合并或睡眠后会丢拍，长时间运行会越走越偏。建议改成记 deadline（`workEndDate`），每次 tick 用 `Date()` 算差值。
-7. **README 与实现不一致**。README 写「空闲 5 分钟暂停」，代码是 `60 + breakDurationSeconds`（默认 80 秒）。要么改文档，要么改阈值。
-8. **日志只有 stdout**。菜单栏 app 从 Finder 启动时 `print` 无处可去，用户报「更新失败」时没法自查。建议换 `os.Logger`（可在「控制台」里按 subsystem 过滤），或加一个「导出诊断信息」菜单项。
-9. **没有测试**。`SemVer` 比较、`validateZipEntries`（防 zip-slip）、`L10n` 键位完整性都很好测，加个 `Tests/` target，CI 里跑 `swift test`。
-10. **没有格式化/静态检查**。`TimerManager.isInMeeting` 还有行尾空格。加 `swift-format` 或 `.swiftformat` 并在 CI 里 `--lint`。
+6. ~~**计时器有累积漂移**~~（第二轮已改为 wall-clock deadline：`workDeadline` / `breakDeadline`）。
+7. ~~**README 与实现不一致**~~（已统一：空闲阈值固定 5 分钟，且改为可选的暂停时机）。
+8. ~~**日志只有 stdout**~~（已加 `Log.swift` 文件日志：`~/Library/Logs/iCanHazRepose/`，1 MB 滚动）。
+9. ~~**没有测试**~~（已加 `Tests/ICHRCoreTests` 与 `scripts/check-l10n.py`，两者都接进 CI）。
+10. **没有格式化/静态检查**（行尾空格已清理；CI 仍无 lint，见第八轮待办）。
 11. **bundle id 和上游相同**（`wtf.d7.icanhazrepose`）。同时装原版和汉化版会共用 `UserDefaults`、冲突「开机启动」注册（`SMAppService.mainApp` 按路径注册，容易残留）。如果希望两个版本共存，改成 `wtf.d7.icanhazrepose.zh`——代价是现有用户要重装一次。
 12. **本地化方案的天花板**。现在是 `L10n.swift` 里硬编码两种语言，加第三种语言要改代码、且不能交给社区翻译。中期建议迁到 `Resources/<lang>.lproj/Localizable.strings` + `NSLocalizedString`，`build.sh` 里补一句 `cp -R res/lproj/*.lproj` 即可。
 
@@ -89,7 +94,7 @@
 |---|---|---|
 | 休息引导语 | `L10n.breakTips` · `BreakOverlayView` · `CompactBreakOverlayView` | 每次休息随机一条（中英各 10 条），长休息期间每 20 秒换一条，取词时排除上一条避免重复 |
 | 番茄节奏 | `SettingsKey.longBreakEvery` / `longBreakSeconds` · `TimerManager.startBreak()` | 每完成 N 个工作轮次进入长休息；菜单「番茄节奏」提供 关闭 / 2·10 / 3·15 / 4·15 / 4·25 / 5·30 六档，两个值编码进菜单项 tag 一起匹配 |
-| 渐进式提醒 | `SettingsKey.progressiveReminders` · `TimerManager.updateImminentFlag()` | 剩余 1 分钟时菜单栏图标切 `hourglass` 并轻响一声；连续跳过 2 次后，下一次休息不可跳过（`skipBreak()` 内部拦截，Esc 热键一并失效） |
+| 渐进式提醒 | `Settings.Key.progressiveReminders` · `TimerManager.updateImminentFlag()` | 剩余 1 分钟时菜单栏图标切 `hourglass` 并轻响一声；连续跳过 2 次后显示一句提示（**第六轮起不再阻止跳过**，Esc 始终有效） |
 | 文件日志 | `Log.swift` | 写入 `~/Library/Logs/iCanHazRepose/iCanHazRepose.log`，串行队列 + 1 MB 滚动到 `.1.log`；启动时记录配置与日志路径 |
 
 同时修掉了 P1 第 8 条（日志只有 stdout）。
@@ -102,14 +107,14 @@
 
 - 菜单顶部新增 **立即休息 / Take a Break Now**（快捷键 `B`）：随时进入短休息；
   不消耗番茄工作轮次、不影响下一次长休息的位置；休息中禁用，重复调用无副作用。
-- 主动手动休息会清除连续跳过计数；会议中仍会延后弹出，保持“不打断会议”的原有原则。
+- ~~主动手动休息会清除连续跳过计数~~（第三轮已推翻：只在真正完成休息时清零，否则「立即休息 + 跳过」可绕过提示）；会议中仍会延后弹出，保持“不打断会议”的原则。
 
 ### 本轮修复
 
 | 问题 | 修复 |
 |---|---|
 | 每秒 `-1` 造成累计漂移，长休息误差更明显 | 工作与休息均改用 wall-clock deadline，延迟 tick 会补齐而不是永久延长 |
-| 强制休息可被“重新开始计时”或会议检测绕过 | 统一状态转换；休息中禁止 restart，会议只中断非强制休息，且不计为用户跳过 |
+| 强制休息可被“重新开始计时”或会议检测绕过 | 统一状态转换；休息中禁止 restart，会议只中断非强制休息，且不计为用户跳过（*强制休息的概念已在第六轮整体移除*） |
 | 最后 1 分钟提醒在暂停恢复后失效 | 按剩余区间计算提醒状态，恢复时可重新进入提醒 |
 | 休息中修改“允许跳过”时按钮与 Esc 行为不一致 | 新增 `canSkipBreak` 作为视图、热键、状态机的唯一判断 |
 | 长/短休息设置在当前休息中变化会改变进度环总量 | 开始休息时快照 `activeBreakTotalSeconds` |
@@ -230,12 +235,12 @@ ad-hoc 包若不写这个 DR，DR 会退化成 cdhash，新旧版本必然不匹
   - `TimerRules`：时长换算、长休息判定、剩余时间、提醒阈值、跳过提示、时间格式化；
   - `Settings`：所有偏好唯一来源，setter 内 clamp + 持久化 + `@Published`。
 - `TimerManager` 退化为协调者：状态机 + 定时器 + 系统通知 + 遮罩调度。
-- `Tests/ICHRCoreTests`：34 项规则与设置测试；`scripts/check-l10n.py`：文案完整性审计。
+- `Tests/ICHRCoreTests`：规则与设置测试（当时 34 项，重构后 24 项）；`scripts/check-l10n.py`：文案完整性审计。
   两者都接进 CI（`swift test` 需完整 Xcode，本地仅有 CLT 时跳过）。
 
 ### 已知限制
 - `swift test` 依赖 XCTest，只能在完整 Xcode 下运行；本地用 `swiftc -typecheck`
-  与等价的行为脚本验证（33 项状态测试 + 34 项 Core 断言）。
+  与等价的行为脚本验证（46 项状态行为断言 + 24 项 XCTest）。
 - 公证顺序问题（见上一节）仍未处理，需在启用签名时一并调整。
 
 ---
@@ -307,3 +312,29 @@ x86_64 会覆盖先跑的 arm64——`lipo` 直接报 "no eligible inputs"。
 `external macro implementation type 'SwiftUIMacros.StateMacro' could not be found`。
 `build.sh` 现在若发现 `DEVELOPER_DIR` 未设置且 `xcode-select` 指向 CLT，会自动选用
 最新的 `/Applications/Xcode*.app`（并打印所选路径）；一个 Xcode 都没有时给出明确警告。
+
+---
+
+## 第九轮：全项目审计（2026-10-28）
+
+完整报告见 [`docs/audit-2026-10-28.md`](audit-2026-10-28.md)。摘要：
+
+### 修复
+1. **自动检查更新从未真正触发**：定时器首次回调在启动 24 小时后，菜单栏应用很少连续运行那么久。
+   改为持久化 `lastUpdateCheck`，启动时若已过期则 5 秒后补检，随后按每日节奏。
+2. **`dev-release` 最后一步必然失败**：它调用仓库外的 `share` 脚本。改为探测后跳过，
+   步骤计数随之从 9 变 8。
+3. **版本号落后**：`Info.plist` 从 1.0.3 提升到 1.0.5（线上已发布 1.0.4）。
+4. **死代码**：删除 `L10n.breakSoon`、`L10n.longBreakStarted`、`PauseTrigger.isEnabled`。
+
+### 文档
+- 修正本文件前几轮已被推翻的结论（强制休息、`SettingsKey`、测试项数、无法本机编译等），
+  并在文首加了「以最新轮次为准」的阅读提示。
+- README 补上休息引导语与渐进式提醒，并把「Escape 永远可退出」修正为
+  「除非关闭『允许跳过休息』」。
+- 新增 `docs/audit-2026-10-28.md`：完整问题清单（含未修项与理由）。
+
+### 仍未处理（详见审计报告）
+- 安装更新失败无提示；公证顺序倒置；zip 符号链接未校验；
+- 两张界面截图过期；`.roorules` / `.env.example` 未随项目演进更新；
+- 无 CI lint、无辅助功能标签。
