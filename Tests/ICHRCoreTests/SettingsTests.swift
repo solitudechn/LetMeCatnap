@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 @testable import ICHRCore
 
 final class SettingsTests: XCTestCase {
