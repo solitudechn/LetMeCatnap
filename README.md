@@ -2,13 +2,13 @@
   <img src="assets/icon.png" width="128" height="128" alt="LetMeCatnap icon"/>
   <h1>LetMeCatnap</h1>
   <p><strong>Take breaks from your screen. Without interrupting your meetings.</strong></p>
-  <a href="https://github.com/solitudechn/iCanHazRepose/releases/latest/download/LetMeCatnap.dmg">
+  <a href="https://github.com/solitudechn/LetMeCatnap/releases/latest/download/LetMeCatnap.dmg">
     <img src="assets/download-button.svg" alt="Download for Mac">
   </a>
   <p><sub>Free and open source. Requires macOS 13+. 简体中文界面。</sub></p>
 
-  [![CI](https://github.com/solitudechn/iCanHazRepose/actions/workflows/ci.yml/badge.svg)](https://github.com/solitudechn/iCanHazRepose/actions/workflows/ci.yml)
-  [![Release](https://github.com/solitudechn/iCanHazRepose/actions/workflows/release.yml/badge.svg)](https://github.com/solitudechn/iCanHazRepose/actions/workflows/release.yml)
+  [![CI](https://github.com/solitudechn/LetMeCatnap/actions/workflows/ci.yml/badge.svg)](https://github.com/solitudechn/LetMeCatnap/actions/workflows/ci.yml)
+  [![Release](https://github.com/solitudechn/LetMeCatnap/actions/workflows/release.yml/badge.svg)](https://github.com/solitudechn/LetMeCatnap/actions/workflows/release.yml)
 </div>
 
 <br/>
@@ -22,7 +22,7 @@
 <div align="center">
   <a href="https://github.com/fikrikarim/repose">originally created by Fikri Karim</a> ·
   <a href="https://github.com/deseven/iCanHazRepose">upstream maintained by deseven</a> ·
-  <a href="https://github.com/solitudechn/iCanHazRepose">this build</a>
+  <a href="https://github.com/solitudechn/LetMeCatnap">this build</a>
 </div>
 
 <br/>
@@ -82,7 +82,7 @@ The break screen hides its countdown after three seconds and puts the guidance f
 
 ### Download
 
-**Stable** release — download from the [Releases](https://github.com/solitudechn/iCanHazRepose/releases) page.
+**Stable** release — download from the [Releases](https://github.com/solitudechn/LetMeCatnap/releases) page.
 
 The download is not notarized, so the first launch may be blocked by Gatekeeper
 ("damaged" / "cannot be verified"). Clear the quarantine flag once:
@@ -92,14 +92,14 @@ xattr -dr com.apple.quarantine /Applications/LetMeCatnap.app
 ```
 
 **Dev** build — every push to `main` is compiled by CI; grab the artifact from the
-[latest CI run](https://github.com/solitudechn/iCanHazRepose/actions/workflows/ci.yml).
+[latest CI run](https://github.com/solitudechn/LetMeCatnap/actions/workflows/ci.yml).
 *(only use this if you need unreleased functionality or want to help with testing)*
 
 ### Build from source
 
 ```
-git clone https://github.com/solitudechn/iCanHazRepose.git
-cd iCanHazRepose
+git clone https://github.com/solitudechn/LetMeCatnap.git
+cd LetMeCatnap
 ./build.sh
 ```
 
@@ -116,7 +116,7 @@ uploading or launching anything.
 Updates are handled by [Sparkle 2](https://sparkle-project.org), not by
 hand-rolled code:
 
-- the feed is `https://github.com/solitudechn/iCanHazRepose/releases/latest/download/appcast.xml`,
+- the feed is `https://github.com/solitudechn/LetMeCatnap/releases/latest/download/appcast.xml`,
   so publishing a release is the only step needed to ship an update;
 - every release archive is signed with an Ed25519 key; the public half lives in
   `Info.plist` as `SUPublicEDKey`, and Sparkle refuses anything that does not

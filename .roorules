@@ -65,10 +65,9 @@ Rules of thumb:
   `BundleIdentityTests` fails if the two drift apart. `legacyIdentifiers` in the same file is
   **append-only** — drop an entry and the settings of everyone who installed that build vanish
   on upgrade.
-- The app name is `LetMeCatnap`; the GitHub repository is still `solitudechn/iCanHazRepose`.
-  That is deliberate (renaming a repo buys nothing for users), so paths in the README and in
-  `Info.plist`'s `SUFeedURL` point at the old slug. If the repo is ever renamed, change
-  `BundleIdentity.repository` and `SUFeedURL` together — a test keeps them in sync.
+- The repository slug appears in exactly two places — `BundleIdentity.repository` and
+  `Info.plist`'s `SUFeedURL` — and a test fails when they disagree. Changing one without the
+  other points the updater at a 404, which nobody notices until the next release.
 - Style is enforced by `.swift-format` (4 spaces, 110 columns). Run
   `swift format --in-place --recursive src core Tests` instead of hand-aligning.
 

@@ -19,7 +19,7 @@ public enum BundleIdentity {
     ]
 
     /// GitHub repository that publishes the releases and the update feed.
-    public static let repository = "solitudechn/iCanHazRepose"
+    public static let repository = "solitudechn/LetMeCatnap"
 
     public static let repositoryURL = "https://github.com/\(repository)"
 

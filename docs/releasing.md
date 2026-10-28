@@ -116,16 +116,19 @@ xattr -dr com.apple.quarantine /Applications/LetMeCatnap.app
 `legacyIdentifiers` 是**只增不减**的列表：每换一次 id 就把上一个加进去，否则老用户的
 设置会在升级后静默丢失。`BundleIdentityTests` 会检查前两个 id 都还在列表里。
 
-### 仓库名与 bundle id 是两件事
+### 仓库名与 bundle id
 
-仓库目前仍叫 `solitudechn/iCanHazRepose`，而应用叫 `LetMeCatnap`——GitHub 仓库名
-不影响用户看到的东西，所以没有强行改。如果以后把仓库也改名，需要同步两处
-（`BundleIdentityTests` 会因为它俩不一致而报错）：
+仓库、应用、bundle id 现在三者同名：`LetMeCatnap` / `io.github.solitudechn.letmecatnap`。
+仓库早先叫 `solitudechn/iCanHazRepose`，GitHub 会为旧地址保留跳转，所以旧链接
+（包括已经发出去的 README 和旧的 clone 地址）仍然可用。
+
+仓库地址在代码里只有两处，且必须一致（`BundleIdentityTests` 会在不一致时报错）：
 
 - `core/BundleIdentity.swift` 的 `repository`
 - `Info.plist` 的 `SUFeedURL`
 
-GitHub 会为旧仓库地址保留跳转，已经装了的用户不会因为改名而收不到更新。
+**再改一次仓库名要同时改这两处**，否则订阅源指向一个 404，所有人都收不到更新，
+而且这个错误只有等到下一次发版才会被发现。
 
 ### v1.1.0 是一次性手动升级
 

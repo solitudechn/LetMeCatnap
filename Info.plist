@@ -39,7 +39,7 @@
 	     is the only step needed to make an update visible. Every entry in it must
 	     be signed with the Ed25519 key whose public half is below. -->
 	<key>SUFeedURL</key>
-	<string>https://github.com/solitudechn/iCanHazRepose/releases/latest/download/appcast.xml</string>
+	<string>https://github.com/solitudechn/LetMeCatnap/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>6hUz1htBo9LKDPpkagB7sVCyqFpaZdwGgIsoXvxpT2o=</string>
 	<key>SUEnableAutomaticChecks</key>
