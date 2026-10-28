@@ -96,10 +96,14 @@ xattr -dr com.apple.quarantine /Applications/iCanHazRepose.app
 
 ## 四、bundle id 不能随便改
 
-`CFBundleIdentifier`、`core/BundleIdentity.swift`、`build.sh` 里的 `ident`
-三处必须一致。改了 id，`UserDefaults` 就是另一个命名空间——`Settings` 会在首次
-启动时从 `wtf.d7.icanhazrepose` 迁移一次（见 `Settings.migratePreferences`），
-但 ad-hoc 签名下「应用身份」也会变，`SMAppService`（开机启动注册）需要用户重新打开一次。
+`Info.plist` 的 `CFBundleIdentifier` 是**唯一来源**：`build.sh` 读它来生成 ad-hoc
+签名的 designated requirement，`core/BundleIdentity.swift` 里的
+`BundleIdentity.identifier` 只是它的镜像，由 `BundleIdentityTests` 保证一致
+（改了 Info.plist 忘了改代码，测试会红）。
+
+改了 id 的后果：`UserDefaults` 就是另一个命名空间——`Settings` 会在首次启动时从
+`wtf.d7.icanhazrepose` 迁移一次（见 `Settings.migratePreferences`），但「开机启动」
+是系统按 bundle id 记的，需要用户在菜单里重新打开一次。
 
 ### v1.1.0 是一次性手动升级
 

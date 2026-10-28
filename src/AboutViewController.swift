@@ -147,7 +147,10 @@ class AboutViewController: NSViewController {
         createdByLabel.alignment = .center
         createdByLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        let desevenLink = LinkButton(title: "deseven", url: AppConstants.websiteURL)
+        // Points at the upstream repository rather than a marketing site: for
+        // someone running the fork, "where does this app come from" is the
+        // useful question, and the answer is the source.
+        let desevenLink = LinkButton(title: "deseven", url: AppConstants.upstreamRepoURL)
 
         // "original code by" section
         let originalCodeByLabel = NSTextField(labelWithString: L10n.t(.originalCodeBy))
@@ -167,7 +170,7 @@ class AboutViewController: NSViewController {
         localizedByLabel.alignment = .center
         localizedByLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        let localizerLink = LinkButton(title: "solitudechn", url: AppConstants.githubRepoURL)
+        let localizerLink = LinkButton(title: "solitudechn", url: BundleIdentity.repositoryURL)
 
         // "icons by" section
         let iconsByLabel = NSTextField(labelWithString: L10n.t(.iconsBy))
@@ -180,7 +183,7 @@ class AboutViewController: NSViewController {
 
         // Social link buttons
         let kofiButton = makeIconButton(imageName: "bx-kofi", url: AppConstants.kofiURL)
-        let githubButton = makeIconButton(imageName: "bx-github", url: AppConstants.githubRepoURL)
+        let githubButton = makeIconButton(imageName: "bx-github", url: BundleIdentity.repositoryURL)
         let redditButton = makeIconButton(imageName: "bx-reddit", url: AppConstants.redditURL)
         let discordButton = makeIconButton(imageName: "bx-discord", url: AppConstants.discordURL)
 

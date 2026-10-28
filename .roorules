@@ -35,12 +35,15 @@ Rules of thumb:
 - Updates belong to Sparkle. Do not reintroduce a hand-written downloader: the release
   contract is `appcast.xml` (signed with `SPARKLE_ED_PRIVATE_KEY`) + `iCHR.zip` + the Ed25519
   public key in `Info.plist`. See `docs/releasing.md`.
-- Break reminders must never trap the user: skipping a break is always allowed, and Escape
-  always closes the full-screen overlay when "Allow Skip Break" is on.
+- Break reminders must never trap the user: skipping a break is allowed by default, and
+  the only thing that takes it away is the user's own "Allow Skip Break" setting — never
+  make a break unskippable in any other way, and never let a full-screen overlay
+  swallow clicks without giving a way out.
 - Timer state lives in `TimerManager`; anything that pauses or resumes it should go through its
   helpers rather than mutating `state` from the outside.
-- The three bundle identifiers must stay in sync: `Info.plist`, `core/BundleIdentity.swift`
-  and the `ident` variable in `build.sh`.
+- The bundle identifier has exactly one source: `Info.plist`. `build.sh` reads it for the
+  ad-hoc signing requirement, `core/BundleIdentity.swift` mirrors it, and
+  `BundleIdentityTests` fails if the two drift apart.
 - Style is enforced by `.swift-format` (4 spaces, 110 columns). Run
   `swift format --in-place --recursive src core Tests` instead of hand-aligning.
 

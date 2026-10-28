@@ -77,6 +77,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         Log.info(
             "Rhythm: longBreakEvery=\(settings.longBreakEvery), longBreak=\(settings.longBreakSeconds)s, progressiveReminders=\(settings.progressiveReminders)"
         )
+        if settings.migratedLegacyPreferences {
+            // The app was renamed (new bundle id), so the old preferences lived
+            // in a different UserDefaults domain. Say so, it explains a lot for
+            // someone upgrading from 1.0.x.
+            Log.info("Preferences migrated from the previous bundle identifier")
+        }
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(

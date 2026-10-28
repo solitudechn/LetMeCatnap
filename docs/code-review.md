@@ -6,7 +6,7 @@
 
 > **阅读提示**：本文是按轮次追加的审查日志，记录的是「当时」的结论。
 > 前几轮判定的若干问题已被后续轮次修复或推翻（已在正文用删除线标出），
-> 判断项目当前状态请看文末最新的「第九轮」与 [`docs/audit-2026-10-28.md`](audit-2026-10-28.md)。
+> 判断项目当前状态请看文末最新的「第十轮」与 [`docs/audit-2026-10-28.md`](audit-2026-10-28.md)。
 
 ---
 
@@ -361,3 +361,22 @@ x86_64 会覆盖先跑的 arm64——`lipo` 直接报 "no eligible inputs"。
 
 同时补了 `.swift-format` + CI lint、辅助功能标签、`scripts/verify.sh`、`.roorules` 重写，
 以及关于窗口里的汉化署名。界面截图仍未重截（本机进程无屏幕录制权限）。
+
+---
+
+## 第十一轮：发布前复查（2026-10-28 晚）
+
+对全部 49 个受控文件重审一遍，发现并修掉 7 处问题，其中两处是真 bug：
+
+1. **`TimerRules.showsSkipHint` 只被测试调用**，App 里另有一份拷贝——测的不是跑的那份；
+   已让 `TimerManager` 直接调用它。
+2. **`OverlayManager` 读全局 `Settings.shared`** 而不是 `timerManager.settings`，
+   热键与按钮可能来自两份设置；已改。
+3. `Log.error` 零调用（失败在日志里和成功长得一样）、`Settings.migratedLegacyPreferences`
+   只写不读、`AppConstants.appShortName` 死代码、bundle id 三处重复——都已收拾干净，
+   并新增 `BundleIdentityTests`（37 项测试）。
+4. 文档与实现不符 4 处（审查日志、审计报告、`.roorules`、发布手册）已改。
+
+留了一个需要你决定的问题：关掉「允许跳过休息」后，完整遮罩既没有 Esc 也没有按钮，
+还会吞掉全屏幕的点击，屏幕最长被锁 10 分钟——与「Esc 随时可退出」的原则冲突。
+详见 [`docs/audit-2026-10-28.md`](audit-2026-10-28.md) 第八节。

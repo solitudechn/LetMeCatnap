@@ -144,6 +144,21 @@ swift format lint -r src core Tests # style, config in .swift-format
 
 All of them run in CI on every push.
 
+## Troubleshooting / 日志
+
+The app keeps a rotating log at
+`~/Library/Logs/iCanHazRepose/iCanHazRepose.log` — every state change, every
+update check, every failure. When something looks wrong, that file is the first
+thing to attach to a bug report.
+
+```sh
+tail -f ~/Library/Logs/iCanHazRepose/iCanHazRepose.log
+```
+
+应用会把所有状态变化、检查更新结果和失败原因写进
+`~/Library/Logs/iCanHazRepose/iCanHazRepose.log`（超过 1 MB 自动滚动），
+反馈问题时请附上这个文件。
+
 ## Localization / 界面语言
 
 The UI ships with **English** and **简体中文** and follows your system language by default. Override it any time from the menu bar: **Language / 语言 → 跟随系统 / English / 简体中文**. The change applies immediately — no restart needed.

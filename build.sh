@@ -4,13 +4,20 @@ set -euo pipefail
 
 name="iCanHazRepose"
 shortName="iCHR"
-# Must match `BundleIdentity.identifier` in core/BundleIdentity.swift and
-# CFBundleIdentifier in Info.plist. The ad-hoc signing requirement below is
-# pinned to it, and the updater relies on the requirement surviving an update.
-ident="io.github.solitudechn.icanhazrepose"
 loc="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 logFile="$loc/build.log"
 logMark=1
+
+# The ad-hoc signing requirement is pinned to the bundle identifier, and both
+# Sparkle's installer and the updater compare that requirement across
+# versions. Read it from Info.plist so there is exactly one place to change it
+# (the Swift side mirrors it in core/BundleIdentity.swift, and a unit test
+# keeps the two in sync).
+ident=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$loc/Info.plist" 2>/dev/null || true)
+if [ -z "$ident" ]; then
+    echo "could not read CFBundleIdentifier from Info.plist" >&2
+    exit 1
+fi
 
 # Load .env if present
 if [ -f "$loc/.env" ]; then

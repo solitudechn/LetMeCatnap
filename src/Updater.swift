@@ -37,10 +37,10 @@ final class Updater: NSObject, SPUUpdaterDelegate {
         let feed = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String ?? "<missing>"
         let key = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String
         Log.info("updater started (feed: \(feed), signing key: \(key == nil ? "MISSING" : "present"))")
-        if key == nil {
+        if key?.isEmpty != false {
             // Sparkle rejects every download without a signing key. Say so in the
             // log instead of letting the check fail with a generic error later.
-            Log.info("updater: SUPublicEDKey is absent — automatic updates cannot be verified")
+            Log.error("updater: SUPublicEDKey is absent — automatic updates cannot be verified")
         }
     }
 
@@ -74,7 +74,7 @@ final class Updater: NSObject, SPUUpdaterDelegate {
             Log.info("update cycle finished without error")
             return
         }
-        Log.info("update cycle failed: \(error.localizedDescription)")
+        Log.error("update cycle failed: \(error.localizedDescription)")
     }
 
     func updater(_ updater: SPUUpdater, didDownloadUpdate item: SUAppcastItem) {
@@ -82,7 +82,7 @@ final class Updater: NSObject, SPUUpdaterDelegate {
     }
 
     func updater(_ updater: SPUUpdater, failedToDownloadUpdate item: SUAppcastItem, error: Error) {
-        Log.info("update download failed: \(error.localizedDescription)")
+        Log.error("update download failed: \(error.localizedDescription)")
     }
 
     func updater(_ updater: SPUUpdater, willInstallUpdate item: SUAppcastItem) {
@@ -90,6 +90,6 @@ final class Updater: NSObject, SPUUpdaterDelegate {
     }
 
     func updater(_ updater: SPUUpdater, didAbortWithError error: Error) {
-        Log.info("updater aborted: \(error.localizedDescription)")
+        Log.error("updater aborted: \(error.localizedDescription)")
     }
 }

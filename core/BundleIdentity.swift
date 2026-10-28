@@ -13,4 +13,14 @@ public enum BundleIdentity {
 
     /// Identifiers this app previously stored preferences under.
     public static let legacyIdentifiers = ["wtf.d7.icanhazrepose"]
+
+    /// GitHub repository that publishes the releases and the update feed.
+    public static let repository = "solitudechn/iCanHazRepose"
+
+    public static let repositoryURL = "https://github.com/\(repository)"
+
+    /// The feed Sparkle polls. Also written into `Info.plist` as `SUFeedURL`;
+    /// a unit test keeps the two in sync.
+    public static let updateFeedURL =
+        "https://github.com/\(repository)/releases/latest/download/appcast.xml"
 }

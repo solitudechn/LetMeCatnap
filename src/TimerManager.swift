@@ -89,7 +89,8 @@ class TimerManager: ObservableObject {
     /// After repeated skips the overlay shows a nudge instead of silently
     /// letting the break go — purely advisory, never blocking.
     var showsSkipHint: Bool {
-        progressiveReminders && state == .onBreak && skipStreak >= TimerRules.skipHintThreshold
+        state == .onBreak
+            && TimerRules.showsSkipHint(streak: skipStreak, enabled: progressiveReminders)
     }
 
     var menuBarText: String {

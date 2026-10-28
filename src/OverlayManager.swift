@@ -147,7 +147,10 @@ class OverlayManager {
     }
 
     private func installKeyMonitor(timerManager: TimerManager) {
-        let allowSkip = Settings.shared.allowSkipBreak
+        // Read the setting from the timer manager's own `Settings` instance
+        // instead of the global singleton: the two can differ, and the hotkey
+        // has to match what the overlay will actually offer.
+        let allowSkip = timerManager.settings.allowSkipBreak
         guard allowSkip else { return }
 
         registerEscapeHotkey { [weak timerManager] in
