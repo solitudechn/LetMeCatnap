@@ -1,6 +1,6 @@
 name: Release
 
-# Push a tag like v1.1.0 (or run this workflow manually) to build a signed /
+# Push a tag like v2.0.0 (or run this workflow manually) to build a signed /
 # notarized (when certificates are configured) universal build and publish it as
 # a GitHub Release.
 #
@@ -8,7 +8,7 @@ name: Release
 # publish three things together:
 #   - `LetMeCatnap.zip`     the update archive Sparkle downloads (exact name)
 #   - `appcast.xml`  the feed, signed with the EdDSA key from Info.plist
-#   - a release title that starts with "LetMeCatnap <x.y.z>" (for humans)
+#   - a release title that starts with "LetMeCatnap <version>" (for humans)
 # `SUFeedURL` points at releases/latest/download/appcast.xml, so publishing a
 # release is what makes an update visible — no separate feed host.
 #
@@ -260,11 +260,13 @@ jobs:
             echo
             echo '3. 也可以直接用 `LetMeCatnap.zip`（应用内自动更新使用的就是这个包）。'
             echo
-            # 1.1.0 换了名字、bundle id 和更新器，这三件事用户必须知道。
-            if [ "$VERSION" = "1.1.0" ]; then
+            # Any 2.x release can still be installed by someone coming from
+            # 1.0.x, so the migration notice is keyed to the major version
+            # rather than to one exact tag.
+            if [ "${VERSION%%.*}" -ge 2 ] 2>/dev/null; then
               echo "### 这个版本有什么变化 / What's new"
               echo '- **改名为 LetMeCatnap**：应用名、图标、bundle id 都换了，可以和原版（iCanHazRepose）并存。'
-              echo '- **从 1.0.x 升级需要手动安装一次**：bundle id 改了，旧版更新器会拒绝替换。设置会自动迁移。'
+              echo '- **如果你还在 1.0.x：需要手动安装一次**（bundle id 改了，旧版更新器会拒绝替换）。设置会自动迁移。'
               echo '- 更新改用 Sparkle：更新包带签名校验，下载或安装失败会明确提示，不再静默。'
               echo '- 休息遮罩**随时可以用 Esc 退出**；菜单里的「允许跳过休息」改成了「显示跳过按钮」，只决定按钮显不显示。'
               echo '- 关于窗口只保留本仓库的 GitHub 入口。'

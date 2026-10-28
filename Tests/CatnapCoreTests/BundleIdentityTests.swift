@@ -52,6 +52,9 @@ final class BundleIdentityTests: XCTestCase {
         let short = plistString("CFBundleShortVersionString")
         XCTAssertNotNil(version)
         XCTAssertEqual(version, short, "the two version keys disagree")
+        // Three components, matching the tag: `v2.0.0` must not become "2.0",
+        // because the release workflow copies the tag into both keys and
+        // Sparkle compares whatever ends up there.
         XCTAssertNotNil(
             version?.range(of: #"^\d+\.\d+\.\d+$"#, options: .regularExpression),
             "version \(version ?? "?") is not of the form x.y.z"
@@ -64,7 +67,7 @@ final class BundleIdentityTests: XCTestCase {
     func testEveryPreviousIdentifierIsStillMigrated() {
         XCTAssertTrue(
             BundleIdentity.legacyIdentifiers.contains("io.github.solitudechn.icanhazrepose"),
-            "the 1.1.0-era identifier was dropped from the migration list"
+            "the pre-rename identifier was dropped from the migration list"
         )
         XCTAssertTrue(
             BundleIdentity.legacyIdentifiers.contains("wtf.d7.icanhazrepose"),

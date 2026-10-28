@@ -187,6 +187,6 @@ from `StringTable`.
 
 ## License
 
-MIT. See [LICENSE](LICENSE) — the copyright notices of both upstream authors are
-kept there, and in the About window under **Author / Upstream author / Original
-code**.
+MIT. See [LICENSE](LICENSE): the copyright notices of the two upstream authors are
+kept verbatim, with this app's own notice added below them. The same three names
+appear in the About window under **Author / Upstream author / Original code**.

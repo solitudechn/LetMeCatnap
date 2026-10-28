@@ -5,14 +5,15 @@
 ## 一、一次发布要做的事
 
 ```sh
-# 1. 改版本号（两处必须一致）
+# 1. 改版本号（两处必须一致，三段式 x.y.z）
 #    Info.plist: CFBundleVersion / CFBundleShortVersionString
+#    tag 里带不带 v 都可以（v2.0.0 / 2.0.0），但必须三段
 # 2. 跑一遍检查
 ./scripts/verify.sh
 # 3. 打包自检（不发布、不上传）
 ./build.sh ci
 # 4. 打标签并推送，Release 工作流接管
-git tag v1.1.0 && git push origin v1.1.0
+git tag v2.0.0 && git push origin v2.0.0
 ```
 
 `Release` 工作流会：编译 arm64 + x86_64 → 合成通用二进制 → 组装 `.app` →
@@ -130,19 +131,20 @@ xattr -dr com.apple.quarantine /Applications/LetMeCatnap.app
 **再改一次仓库名要同时改这两处**，否则订阅源指向一个 404，所有人都收不到更新，
 而且这个错误只有等到下一次发版才会被发现。
 
-### v1.1.0 是一次性手动升级
+### v2.0.0 是一次性手动升级
 
-v1.0.x 里的自研更新器会校验「新包的代码签名要求必须和当前一致」。1.1.0 换了
+v1.0.x 里的自研更新器会校验「新包的代码签名要求必须和当前一致」。2.0.0 换了
 identifier（`wtf.d7.icanhazrepose` → `io.github.solitudechn.letmecatnap`）也换了名字，
 所以老用户点「更新」会收到「下载的应用由不同的签名身份签发」并中止——
 这是设计如此，不是 bug。
 
-发布 v1.1.0 时请在 release 正文最前面加一句：
+发布 2.0.0 时请在 release 正文最前面加一句：
 
 > **从 1.0.x 升级需要手动安装一次**（bundle id 已更改，旧版更新器会拒绝替换）。
 > 下载 `LetMeCatnap.dmg` 覆盖安装即可，设置会自动迁移；此后恢复自动更新。
 
-从 1.1.0 起更新由 Sparkle 负责，不再有这个问题。
+`release.yml` 会在**任何 2.x 及以上**版本的正文里自动插入这段说明（按主版本号判断，
+不写死某个 tag），所以 2.1.0 之后也不会漏。从 2.0.0 起更新由 Sparkle 负责，不再有这个问题。
 
 ## 五、排错
 

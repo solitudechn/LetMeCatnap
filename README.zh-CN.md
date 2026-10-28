@@ -155,4 +155,5 @@ tail -f ~/Library/Logs/LetMeCatnap/LetMeCatnap.log
 
 ## 许可证
 
-MIT，见 [LICENSE](LICENSE)。两位上游作者的版权声明都保留在其中，也显示在关于窗口的 **作者 / 上游作者 / 原始代码** 里。
+MIT，见 [LICENSE](LICENSE)。两位上游作者的版权声明原样保留，本应用的声明追加在其后。
+这三个名字也显示在关于窗口的 **作者 / 上游作者 / 原始代码** 里。
