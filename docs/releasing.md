@@ -7,7 +7,9 @@
 ```sh
 # 1. 改版本号（两处必须一致，三段式 x.y.z）
 #    Info.plist: CFBundleVersion / CFBundleShortVersionString
-#    tag 里带不带 v 都可以（v2.0.0 / 2.0.0），但必须三段
+#    tag 必须带 v 前缀：Release 工作流只监听 v* 的 tag。
+#    打 2.0.0（不带 v）不会触发任何工作流，发布会静默地不发生。
+#    （手动触发 workflow_dispatch 时，版本号反而不带 v）
 # 2. 跑一遍检查
 ./scripts/verify.sh
 # 3. 打包自检（不发布、不上传）
