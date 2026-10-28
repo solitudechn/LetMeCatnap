@@ -5,13 +5,15 @@ no XIBs, no Xcode project — `build.sh` assembles the `.app` bundle by hand.
 
 Layout:
 - `src/` — the app (AppKit/SwiftUI): menu bar (`AppDelegate`), overlays
-  (`BreakOverlayView`, `CompactBreakOverlayView`, `OverlayManager`), timer state machine
+  (`BreakOverlayView`, `CompactBreakOverlayView`, `OverlayManager`), the timer's AppKit half
   (`TimerManager`), meeting detection, the About window, the Sparkle wrapper (`Updater`).
 - `core/` — the `ICHRCore` library: pure Foundation only. `TimerRules` (durations, thresholds),
-  `Settings` (the single source of truth for every preference, with clamping and persistence),
-  `PauseTrigger`, `BundleIdentity`, and the localization (`L10n` + `StringTable`).
-  Keeping it free of AppKit is what makes it unit-testable without a GUI.
-- `Tests/ICHRCoreTests/` — XCTest for `core/` (timing rules, settings, string table).
+  `SessionState` (the timer state machine), `Settings` (the single source of truth for every
+  preference, with clamping and persistence), `PauseTrigger`, `BundleIdentity`, and the
+  localization (`L10n` + `StringTable`). Keeping it free of AppKit is what makes it
+  unit-testable without a GUI.
+- `Tests/ICHRCoreTests/` — XCTest for `core/` (timing rules, the session state machine,
+  settings, string table).
 - `scripts/check-l10n.py` — fails when a `LocKey` has no entry, when a visible string bypasses
   `L10n`, or when a break tip lost its translation.
 - `scripts/verify.sh` — format lint + localization + unit tests + `bash -n build.sh`.
@@ -39,13 +41,12 @@ Rules of thumb:
   "Show Skip Button" preference only controls the visible button — never make a break
   unskippable in any other way, and never let a full-screen overlay swallow clicks
   without a way out.
-- Timer state lives in `TimerManager`; anything that pauses or resumes it should go through its
-  helpers rather than mutating `state` from the outside.
-- `TimerManager` has **no automated tests** — it sits in the AppKit target, which the test bundle
-  cannot import. So every *decision* it makes belongs in `ICHRCore` where `TimerRules` can cover
-  it: that is why `isImminent`, `showsSkipHint`, `shouldPauseForIdle` and `isLongBreak` live
-  there. Never re-implement a rule inside `src/` "just this once" — round 11 found exactly that
-  (`TimerManager` had its own copy of `showsSkipHint`, so the test was checking dead code).
+- Timer state lives in `ICHRCore.SessionState`, not in `TimerManager`. Every transition takes
+  the current time as a parameter and returns `[SessionEffect]`; `TimerManager` owns the clock,
+  the system notifications, the overlays, the sounds and the log. Adding a rule to
+  `TimerManager` instead is how this project once ended up with two copies of
+  `showsSkipHint`, one tested and one shipped. If a decision needs AppKit to express, split it
+  into "decide" (core) and "do" (app).
 - The bundle identifier has exactly one source: `Info.plist`. `build.sh` reads it for the
   ad-hoc signing requirement, `core/BundleIdentity.swift` mirrors it, and
   `BundleIdentityTests` fails if the two drift apart.

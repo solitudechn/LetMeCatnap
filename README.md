@@ -128,8 +128,8 @@ Updates…** in the menu. Skip a version and Sparkle stops offering it.
 
 ## Tests and checks
 
-Timing rules, settings and the string table live in the `ICHRCore` module so they
-can be tested without AppKit:
+Timing rules, the timer's state machine, settings and the string table live in the `ICHRCore`
+module so they can be tested without AppKit:
 
 ```
 ./scripts/verify.sh                 # format lint + copy check + unit tests + shell syntax

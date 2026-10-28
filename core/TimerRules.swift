@@ -17,6 +17,10 @@ public enum TimerRules {
     public static let imminentThreshold = 60
     /// Fade the break overlay's countdown after this many seconds.
     public static let countdownVisibleSeconds: TimeInterval = 3
+    /// The overlay spends this long fading in before its countdown starts.
+    /// The break's own duration does not begin until the grace period is over,
+    /// so a 20 second break is 20 seconds of visible countdown.
+    public static let breakGracePeriod: TimeInterval = 1.5
     /// No input for this long counts as having left the desk. Only consulted
     /// when `PauseTrigger.pausesOnIdle` is selected; five minutes is long
     /// enough that reading a document does not look like an absence.

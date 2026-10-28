@@ -4,64 +4,62 @@ import CoreGraphics
 import Foundation
 import ICHRCore
 
-enum TimerState {
-    case working
-    case onBreak
-    case paused
-}
+/// The timer's phase, as far as the rest of the app is concerned.
+typealias TimerState = SessionPhase
+/// Why the timer is paused.
+typealias PauseReason = PauseCause
 
-enum PauseReason {
-    case manual
-    case meeting
-    case locked
-    case idle
-    case breakPending  // Work timer expired during meeting, waiting for meeting to end
-}
-
+/// Drives `SessionState` and performs the effects it asks for.
+///
+/// All of the *decisions* — when a lock pauses, when a meeting eats a break,
+/// whether resuming continues or restarts — live in `ICHRCore.SessionState`,
+/// where they can be tested without a screen. What is left here is the part
+/// that genuinely needs AppKit: the ticking clock, the system notifications,
+/// the overlay panels, the sounds and the log.
+///
+/// The split exists for a concrete reason. This class used to hold the
+/// decisions itself, and a decision living in an executable target cannot be
+/// imported by the test bundle — which is how it grew a private copy of
+/// `TimerRules.showsSkipHint` while the test kept passing against the copy
+/// nobody ran.
 @MainActor
 class TimerManager: ObservableObject {
-    @Published var state: TimerState = .working
-    @Published var remainingSeconds: Int = 0
+    /// The whole state machine. Publishing the value (rather than a handful of
+    /// mirrored `@Published` fields) keeps one source of truth; the accessors
+    /// below exist so the views did not have to change.
+    @Published private(set) var session: SessionState
 
-    private var timerCancellable: AnyCancellable?
-    private var tickCount: Int = 0
-    private var secondsBeforePause: Int = 0
-    private var pauseReason: PauseReason = .manual
-    private var breakStartTime: Date = .distantPast
-    /// Wall-clock deadlines prevent a delayed timer tick from permanently
-    /// lengthening a work session or break.
-    private var workDeadline: Date?
-    private var breakDeadline: Date?
-    private var nextBreakTipDate: Date?
-    private var activeBreakTotalSeconds = 0
-    private var isEndingBreak = false
-    private var graceAnimTask: Task<Void, Never>?
-    private var wasInMeeting: Bool = false
+    /// Progress of the overlay's fade-in, only used for the countdown's opacity.
+    @Published var isInGracePeriod = false
+    @Published var graceProgress: Double = 1
+    /// Guidance shown on the break overlay; rotated while the break runs.
+    @Published var breakTip: String = ""
 
     let settings: Settings
     let meetingDetector = MeetingDetector()
     let overlayManager = OverlayManager()
-    private let postMeetingBreakDelay = 5
-    let breakGracePeriod: TimeInterval = 1.5
+    let breakGracePeriod = TimerRules.breakGracePeriod
 
-    @Published var isInGracePeriod: Bool = false
-    @Published var graceProgress: Double = 1
-
-    /// Guidance shown on the break overlay; rotated on long breaks.
-    @Published var breakTip: String = ""
-    /// Whether the running break is the longer one from the pomodoro rhythm.
-    @Published private(set) var isLongBreak: Bool = false
-    /// True during the last minute of a work session (progressive reminders).
-    @Published private(set) var isBreakImminent: Bool = false
-    /// Consecutive breaks the user skipped without taking them. Only used for a
-    /// gentle nudge — skipping is always allowed.
-    @Published private(set) var skipStreak: Int = 0
-
-    /// Finished work sessions since launch, used to place long breaks.
-    private var workSessionsCompleted: Int = 0
+    private var timerCancellable: AnyCancellable?
+    private var tickCount = 0
+    private var graceAnimTask: Task<Void, Never>?
+    private var nextBreakTipDate: Date?
+    private var wasInMeeting = false
 
     // Activity to prevent App Nap
     private var activity: NSObjectProtocol?
+
+    // MARK: - Derived values
+
+    var state: TimerState { session.phase }
+    var remainingSeconds: Int { session.remaining }
+    var isLongBreak: Bool { session.isLongBreak }
+    var isBreakImminent: Bool { session.isImminent }
+    var skipStreak: Int { session.skipStreak }
+    var showsSkipButton: Bool { session.showsSkipButton }
+    var showsSkipHint: Bool { session.showsSkipHint }
+    var currentPauseReason: PauseReason? { session.currentPauseCause }
+    var currentBreakTotalSeconds: Int { session.breakTotalSeconds }
 
     var workDurationSeconds: Int { settings.workSeconds }
     var breakDurationSeconds: Int { settings.shortBreakSeconds }
@@ -71,58 +69,34 @@ class TimerManager: ObservableObject {
     var longBreakSeconds: Int { settings.longBreakTotalSeconds }
     var progressiveReminders: Bool { settings.progressiveReminders }
 
-    /// Duration of the break in progress — the ring needs the real total,
-    /// otherwise a 15-minute break would fill up in 20 seconds.
-    var currentBreakTotalSeconds: Int {
-        if state == .onBreak && activeBreakTotalSeconds > 0 {
-            return activeBreakTotalSeconds
-        }
-        return isLongBreak ? longBreakSeconds : breakDurationSeconds
-    }
-
-    /// Whether the break overlay offers an on-screen "Skip" button.
-    ///
-    /// Escape always dismisses a break — a reminder must never be stronger than
-    /// the work it interrupts — so this preference only controls the visible
-    /// button, never whether the user can get out.
-    var showsSkipButton: Bool {
-        state == .onBreak && settings.showSkipButton
-    }
-
-    /// After repeated skips the overlay shows a nudge instead of silently
-    /// letting the break go — purely advisory, never blocking.
-    var showsSkipHint: Bool {
-        state == .onBreak
-            && TimerRules.showsSkipHint(streak: skipStreak, enabled: progressiveReminders)
-    }
-
     var menuBarText: String {
-        switch state {
+        switch session.phase {
         case .working:
-            return TimerRules.formatTime(remainingSeconds)
+            return TimerRules.formatTime(session.remaining)
         case .onBreak:
-            return L10n.t(.breakCountdown, TimerRules.formatTime(remainingSeconds))
+            return L10n.t(.breakCountdown, TimerRules.formatTime(session.remaining))
         case .paused:
-            switch pauseReason {
+            switch session.pauseCause {
             case .meeting:
-                return L10n.t(.meetingCountdown, TimerRules.formatTime(secondsBeforePause))
+                return L10n.t(.meetingCountdown, TimerRules.formatTime(session.banked))
             case .breakPending:
                 return L10n.t(.meetingInProgress)
             case .locked:
                 return L10n.t(.locked)
             case .idle:
-                return L10n.t(.idleCountdown, TimerRules.formatTime(secondsBeforePause))
+                return L10n.t(.idleCountdown, TimerRules.formatTime(session.banked))
             case .manual:
-                return L10n.t(.pausedCountdown, TimerRules.formatTime(secondsBeforePause))
+                return L10n.t(.pausedCountdown, TimerRules.formatTime(session.banked))
             }
         }
     }
 
     var pauseStatusText: String? {
-        guard state == .paused else { return nil }
-        switch pauseReason {
+        guard session.phase == .paused else { return nil }
+        switch session.pauseCause {
         case .meeting:
-            return meetingDetector.meetingSource.map { L10n.t(.pausedWith, $0) } ?? L10n.t(.pausedInMeeting)
+            return meetingDetector.meetingSource.map { L10n.t(.pausedWith, $0) }
+                ?? L10n.t(.pausedInMeeting)
         case .breakPending:
             return meetingDetector.meetingSource.map { L10n.t(.breakPending, $0) }
                 ?? L10n.t(.inMeetingBreakPending)
@@ -135,20 +109,16 @@ class TimerManager: ObservableObject {
         }
     }
 
-    var currentPauseReason: PauseReason? {
-        state == .paused ? pauseReason : nil
-    }
-
     var isInMeeting: Bool {
         meetingDetector.isInMeeting
     }
 
+    // MARK: - Init
+
     init(settings: Settings) {
         self.settings = settings
+        session = SessionState(config: Self.config(from: settings), now: Date())
 
-        remainingSeconds = workDurationSeconds
-        workDeadline = TimerRules.deadline(from: Date(), seconds: remainingSeconds)
-        state = .working
         startTicking()
         observeScreenLock()
 
@@ -166,6 +136,266 @@ class TimerManager: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.handleWake()
+            }
+        }
+    }
+
+    // MARK: - User actions
+
+    func start() {
+        guard session.phase != .onBreak else {
+            Log.info("Timer restart ignored while a break is in progress")
+            return
+        }
+        Log.info("Timer started: work=\(workDurationSeconds / 60)min, break=\(breakDurationSeconds)s")
+        apply { $0.restartTimer(now: Date()) }
+    }
+
+    /// User-requested short break. It does not consume a pomodoro work session
+    /// and therefore does not move the next long break closer.
+    func startBreakNow() {
+        guard session.phase != .onBreak else { return }
+        Log.info("Manual break requested")
+        apply { $0.takeBreakNow(now: Date()) }
+    }
+
+    func pause() {
+        guard session.phase == .working else { return }
+        Log.info("Timer paused by user")
+        apply { $0.pauseManually(now: Date()) }
+    }
+
+    func resume() {
+        guard session.phase == .paused else { return }
+        Log.info("Timer resumed by user")
+        apply { $0.resumeManually(now: Date()) }
+    }
+
+    func togglePause() {
+        switch session.phase {
+        case .working:
+            pause()
+        case .paused:
+            let cause = session.pauseCause
+            guard cause != .meeting && cause != .breakPending else { return }
+            resume()
+        case .onBreak:
+            break
+        }
+    }
+
+    /// Dismisses the break.
+    ///
+    /// `viaKeyboard` is the Escape shortcut, which always works. The on-screen
+    /// button only exists when the preference is on, so the button path has to
+    /// respect it.
+    func skipBreak(viaKeyboard: Bool = false) {
+        guard session.phase == .onBreak else { return }
+        let effects = apply { $0.skipBreak(viaKeyboard: viaKeyboard, now: Date()) }
+        if effects.isEmpty {
+            Log.info("Break skip ignored: the skip button is hidden")
+        } else {
+            Log.info("Break overlay closed: user cancelled")
+        }
+    }
+
+    // MARK: - Settings changes
+
+    func workDurationSettingChanged() {
+        applyConfigurationChange()
+    }
+
+    // Called when the user toggles "Pause During Meetings".
+    func pauseDuringMeetingsSettingChanged(enabled: Bool) {
+        if !enabled {
+            wasInMeeting = false
+            meetingDetector.reset()
+        }
+        applyConfigurationChange()
+    }
+
+    // Called when the user picks a different pause trigger in the menu.
+    func pauseTriggerSettingChanged(_ trigger: PauseTrigger) {
+        applyConfigurationChange()
+    }
+
+    /// One path for every preference change: `SessionState` decides which of
+    /// them can strand the timer, and does it in one place.
+    private func applyConfigurationChange() {
+        apply { $0.configChanged(Self.config(from: settings), now: Date()) }
+    }
+
+    private static func config(from settings: Settings) -> SessionConfig {
+        SessionConfig(
+            workSeconds: settings.workSeconds,
+            shortBreakSeconds: settings.shortBreakSeconds,
+            longBreakEvery: settings.longBreakEvery,
+            longBreakSeconds: settings.longBreakTotalSeconds,
+            progressiveReminders: settings.progressiveReminders,
+            showSkipButton: settings.showSkipButton,
+            pauseDuringMeetings: settings.pauseDuringMeetings,
+            pauseTrigger: settings.pauseTrigger,
+            postMeetingBreakDelay: postMeetingBreakDelay
+        )
+    }
+
+    private static let postMeetingBreakDelay = 5
+
+    // MARK: - Transitions
+
+    /// Applies a transition and performs whatever it asks for, in order.
+    @discardableResult
+    private func apply(
+        _ transition: (inout SessionState) -> [SessionEffect]
+    ) -> [SessionEffect] {
+        let effects = transition(&session)
+        for effect in effects {
+            perform(effect)
+        }
+        return effects
+    }
+
+    private func perform(_ effect: SessionEffect) {
+        switch effect {
+        case .workSessionStarted:
+            // Fresh session: no overlay state may leak into it.
+            graceAnimTask?.cancel()
+            graceAnimTask = nil
+            isInGracePeriod = false
+            graceProgress = 1
+            breakTip = ""
+            nextBreakTipDate = nil
+
+        case .breakStarted(let isLong, let seconds, let manual):
+            isInGracePeriod = true
+            graceProgress = 0
+            startGraceAnimation()
+            breakTip = L10n.randomBreakTip(excluding: breakTip)
+            nextBreakTipDate = Date().addingTimeInterval(breakGracePeriod + 20)
+
+            if isFrontmostAppFullscreen() {
+                overlayManager.showCompactBreakOverlay(timerManager: self)
+                Log.info("Break overlay triggered: compact overlay (fullscreen app detected)")
+            } else {
+                overlayManager.showBreakOverlay(timerManager: self)
+                Log.info("Break overlay triggered: full overlay (work timer expired)")
+            }
+            Log.info(
+                "Break started: \(isLong ? "long" : "short") \(seconds)s "
+                    + "(session #\(session.sessionsCompleted), manual=\(manual))"
+            )
+            if !muteSounds { NSSound(named: "Glass")?.play() }
+
+        case .breakFinished:
+            Log.info("Break overlay closed: timeout completed")
+            graceAnimTask?.cancel()
+            graceAnimTask = nil
+            if !muteSounds { NSSound(named: "Blow")?.play() }
+            overlayManager.dismissWithAnimation { [weak self] in
+                self?.finishBreak()
+            }
+
+        case .breakInterrupted(let reason):
+            switch reason {
+            case .meeting: Log.info("Break interrupted by meeting")
+            case .wake: Log.info("Break dismissed after system wake, timer restarted")
+            }
+            graceAnimTask?.cancel()
+            graceAnimTask = nil
+            overlayManager.dismissOverlay()
+
+        case .breakDismissed:
+            graceAnimTask?.cancel()
+            graceAnimTask = nil
+            overlayManager.dismissOverlay()
+
+        case .breakDeferredToMeeting:
+            Log.info("Break overlay suppressed: meeting in progress")
+
+        case .imminentReminder:
+            Log.info("Break impending: \(session.remaining)s left")
+            if !muteSounds { NSSound(named: "Tink")?.play() }
+
+        case .automaticPauseLifted(let cause):
+            Log.info("Automatic pause lifted (\(cause)) — resuming")
+        }
+    }
+
+    /// Called when the fade-out after `.breakFinished` completes.
+    private func finishBreak() {
+        apply { $0.finishBreak(now: Date()) }
+    }
+
+    // MARK: - Tick
+
+    private func startTicking() {
+        activity = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiated,
+            reason: "Break timer running"
+        )
+
+        timerCancellable = Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.tick()
+            }
+    }
+
+    private func tick() {
+        tickCount += 1
+
+        // Check for meetings every 5 seconds
+        if tickCount % 5 == 0 {
+            if pauseDuringMeetings { checkMeetingStatus() }
+            checkIdleStatus()
+        }
+
+        apply { $0.tick(now: Date()) }
+        updateBreakPresentation()
+    }
+
+    /// Fade-in bookkeeping and tip rotation — presentation only, so it stays
+    /// out of the state machine.
+    private func updateBreakPresentation() {
+        guard session.phase == .onBreak,
+            let started = session.breakStartedAt,
+            Date().timeIntervalSince(started) >= breakGracePeriod
+        else { return }
+
+        if isInGracePeriod {
+            isInGracePeriod = false
+            graceAnimTask?.cancel()
+            graceAnimTask = nil
+        }
+        graceProgress = 1
+
+        // Rotate by wall-clock time rather than an exact countdown value, which
+        // a delayed tick could otherwise skip.
+        let now = Date()
+        if let next = nextBreakTipDate, now >= next, session.remaining > 0 {
+            breakTip = L10n.randomBreakTip(excluding: breakTip)
+            nextBreakTipDate = now.addingTimeInterval(20)
+        }
+    }
+
+    private func startGraceAnimation() {
+        graceAnimTask?.cancel()
+        graceAnimTask = Task { [weak self] in
+            guard let self else { return }
+            let start = Date()
+            while !Task.isCancelled {
+                let elapsed = Date().timeIntervalSince(start)
+                if elapsed >= self.breakGracePeriod { break }
+                let progress = min(1.0, elapsed / self.breakGracePeriod)
+                await MainActor.run { [weak self] in
+                    self?.graceProgress = progress
+                }
+                try? await Task.sleep(nanoseconds: 50_000_000)  // 50 ms
+            }
+            if !Task.isCancelled {
+                await MainActor.run { [weak self] in
+                    self?.graceProgress = 1
+                }
             }
         }
     }
@@ -210,13 +440,9 @@ class TimerManager: ObservableObject {
         }
     }
 
-    /// Whether the session is locked.
-    ///
-    /// The decision itself lives in `TimerRules` and is unit-tested; this hook
-    /// exists so the state machine can be exercised without really locking the
-    /// screen. `TimerManager` sits in the AppKit target, so it has no automated
-    /// tests of its own — see the “no tests for the state machine” item in
-    /// `docs/audit-2026-10-28.md`.
+    /// Whether the session is locked. Injectable so the lock path can be
+    /// exercised without really locking the screen; the decision it feeds lives
+    /// in `SessionState` and is covered by `SessionStateTests`.
     var screenLockedProvider: () -> Bool = { TimerManager.sessionIsLocked() }
 
     static func sessionIsLocked() -> Bool {
@@ -227,30 +453,28 @@ class TimerManager: ObservableObject {
     }
 
     private func handleScreenLocked() {
-        guard settings.pauseTrigger.pausesOnLock, state == .working else { return }
-        updateWorkingCountdown()
-        secondsBeforePause = remainingSeconds
-        workDeadline = nil
-        isBreakImminent = false
-        state = .paused
-        pauseReason = .locked
-        Log.info("Timer paused: screen locked (\(secondsBeforePause)s banked)")
+        guard session.phase == .working else { return }
+        apply { $0.screenLocked(now: Date()) }
+        if session.phase == .paused, session.pauseCause == .locked {
+            Log.info("Timer paused: screen locked (\(session.banked)s banked)")
+        }
     }
 
     private func handleScreenUnlocked() {
-        guard state == .paused, pauseReason == .locked else { return }
-        // Display wake fires before the unlock in most cases — stay paused
-        // until the session really is unlocked.
-        if settings.pauseTrigger.pausesOnLock && screenLockedProvider() { return }
-        Log.info("Screen unlocked — starting a full work session")
-        resumeFromAutomaticPause()
+        let wasLockedPaused = session.phase == .paused && session.pauseCause == .locked
+        // Display wake fires before the unlock in most cases, so pass the real
+        // lock state and let the state machine decide.
+        apply { $0.screenUnlocked(isScreenLocked: screenLockedProvider(), now: Date()) }
+        if wasLockedPaused && session.phase == .working {
+            Log.info("Screen unlocked — starting a full work session")
+        }
     }
 
     // MARK: - Idle (opt-in alternative to the lock screen)
 
     /// Seconds since the last keyboard or mouse event. Same idea as
-    /// `screenLockedProvider`: the threshold rules live in (and are tested via)
-    /// `TimerRules`, this hook only feeds them.
+    /// `screenLockedProvider`: the threshold rules live in `TimerRules`, this
+    /// hook only feeds them.
     var secondsSinceInputProvider: () -> TimeInterval = {
         // `~0` is the documented way to ask for "any event type" here; the
         // initializer only fails for values that fit in the raw type, so the
@@ -262,259 +486,46 @@ class TimerManager: ObservableObject {
     private func checkIdleStatus() {
         guard settings.pauseTrigger.pausesOnIdle else { return }
         let idle = secondsSinceInputProvider()
+        let wasWorking = session.phase == .working
+        let wasIdlePaused = session.phase == .paused && session.pauseCause == .idle
 
-        if TimerRules.shouldPauseForIdle(
-            secondsSinceInput: idle,
-            trigger: settings.pauseTrigger,
-            isWorking: state == .working
-        ) {
-            updateWorkingCountdown()
-            secondsBeforePause = remainingSeconds
-            workDeadline = nil
-            isBreakImminent = false
-            state = .paused
-            pauseReason = .idle
-            Log.info("Timer paused: idle for \(Int(idle))s (\(secondsBeforePause)s banked)")
-        } else if state == .paused, pauseReason == .idle,
-            TimerRules.isBackFromIdle(secondsSinceInput: idle, trigger: settings.pauseTrigger)
-        {
+        apply { $0.inputActivity(secondsSinceInput: idle, now: Date()) }
+
+        if wasWorking && session.phase == .paused {
+            Log.info("Timer paused: idle for \(Int(idle))s (\(session.banked)s banked)")
+        } else if wasIdlePaused && session.phase == .working {
             Log.info("User is back after an idle pause — starting a full work session")
-            resumeFromAutomaticPause()
         }
-    }
-
-    /// Lifting a lock/idle pause is always a fresh cycle: the user was away,
-    /// which is what the break was for.
-    private func resumeFromAutomaticPause() {
-        beginWorking(seconds: workDurationSeconds)
     }
 
     private func handleWake() {
-        switch state {
-        case .working:
+        let wasWorking = session.phase == .working
+        apply { $0.systemWake(now: Date()) }
+        if wasWorking && session.phase == .working {
             Log.info("Timer restarted after system wake")
-            beginWorking(seconds: workDurationSeconds)
-        case .onBreak:
-            Log.info("Break dismissed after system wake, timer restarted")
-            overlayManager.dismissOverlay()
-            beginWorking(seconds: workDurationSeconds)
-        case .paused:
-            break
         }
     }
 
-    func start() {
-        guard state != .onBreak else {
-            Log.info("Timer restart ignored while a break is in progress")
-            return
-        }
-        Log.info("Timer started: work=\(workDurationSeconds / 60)min, break=\(breakDurationSeconds)s")
-        beginWorking(seconds: workDurationSeconds)
-    }
+    // MARK: - Meetings
 
-    /// User-requested short break. It does not consume a pomodoro work session
-    /// and therefore does not move the next long break closer.
-    func startBreakNow() {
-        guard state != .onBreak else { return }
-        Log.info("Manual break requested")
-        startBreak(countWorkSession: false)
-    }
+    private func checkMeetingStatus() {
+        meetingDetector.check()
 
-    func pause() {
-        guard state == .working else { return }
-        Log.info("Timer paused by user")
-        updateWorkingCountdown()
-        secondsBeforePause = remainingSeconds
-        workDeadline = nil
-        isBreakImminent = false
-        state = .paused
-        pauseReason = .manual
-    }
-
-    func resume() {
-        guard state == .paused else { return }
-        Log.info("Timer resumed by user")
-        beginWorking(seconds: secondsBeforePause, resetImminent: false)
-        pauseReason = .manual
-        updateImminentFlag()
-    }
-
-    /// Dismisses the break.
-    ///
-    /// `viaKeyboard` is the Escape shortcut, which always works. The on-screen
-    /// button only exists when `showsSkipButton` is on, so the button path has
-    /// to respect the preference.
-    func skipBreak(viaKeyboard: Bool = false) {
-        guard state == .onBreak else { return }
-        guard viaKeyboard || showsSkipButton else {
-            Log.info("Break skip ignored: the skip button is hidden")
-            return
-        }
-        Log.info("Break overlay closed: user cancelled")
-        overlayManager.dismissOverlay()
-        skipStreak += 1
-        beginWorking(seconds: workDurationSeconds)
-    }
-
-    func workDurationSettingChanged() {
-        guard state == .working else { return }
-        if remainingSeconds > workDurationSeconds {
-            remainingSeconds = workDurationSeconds
-        }
-        // Keep the remaining time, but move its deadline to match a setting
-        // change made between timer ticks.
-        workDeadline = TimerRules.deadline(from: Date(), seconds: remainingSeconds)
-        updateImminentFlag()
-    }
-
-    func togglePause() {
-        if state == .working {
-            pause()
-        } else if state == .paused && pauseReason != .meeting && pauseReason != .breakPending {
-            resume()
-        }
-    }
-
-    // Called when the user toggles "Pause During Meetings".
-    func pauseDuringMeetingsSettingChanged(enabled: Bool) {
-        guard !enabled else { return }
-        wasInMeeting = false
-        meetingDetector.reset()
-        guard state == .paused else { return }
-        switch pauseReason {
-        case .meeting, .breakPending:
-            Log.info("Pause During Meetings disabled while in meeting pause — resuming")
-            beginWorking(seconds: workDurationSeconds)
-            pauseReason = .manual
-        default:
-            break
-        }
-    }
-
-    // Called when the user picks a different pause trigger in the menu.
-    func pauseTriggerSettingChanged(_ trigger: PauseTrigger) {
-        guard state == .paused else { return }
-        switch pauseReason {
-        case .locked where !trigger.pausesOnLock:
-            Log.info("Lock pause disabled while paused — resuming")
-            resumeFromAutomaticPause()
-        case .idle where !trigger.pausesOnIdle:
-            Log.info("Idle pause disabled while paused — resuming")
-            resumeFromAutomaticPause()
-        default:
-            break
-        }
-    }
-
-    // MARK: - Private
-
-    /// Centralized transition out of breaks/pauses and into a running work
-    /// session. Every caller gets a fresh wall-clock deadline and no stale
-    /// overlay/animation state.
-    private func beginWorking(seconds: Int, resetImminent: Bool = true) {
-        let duration = max(0, seconds)
-        graceAnimTask?.cancel()
-        graceAnimTask = nil
-        isInGracePeriod = false
-        graceProgress = 1
-        isEndingBreak = false
-        isLongBreak = false
-        activeBreakTotalSeconds = 0
-        breakTip = ""
-        breakDeadline = nil
-        nextBreakTipDate = nil
-        remainingSeconds = duration
-        workDeadline = TimerRules.deadline(from: Date(), seconds: duration)
-        if resetImminent {
-            isBreakImminent = false
-        }
-        state = .working
-    }
-
-    private func updateWorkingCountdown(now: Date = Date()) {
-        if workDeadline == nil {
-            workDeadline = TimerRules.deadline(from: now, seconds: remainingSeconds)
-        }
-        guard let workDeadline else { return }
-        remainingSeconds = TimerRules.remainingSeconds(deadline: workDeadline, now: now)
-    }
-
-    private func startTicking() {
-        activity = ProcessInfo.processInfo.beginActivity(
-            options: .userInitiated,
-            reason: "Break timer running"
-        )
-
-        timerCancellable = Timer.publish(every: 1, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                self?.tick()
+        if meetingDetector.isInMeeting {
+            if !wasInMeeting {
+                Log.info("Meeting mode entered (\(meetingDetector.meetingSource ?? "unknown"))")
+                wasInMeeting = true
             }
-    }
-
-    private func tick() {
-        tickCount += 1
-
-        // Check for meetings every 5 seconds
-        if tickCount % 5 == 0 {
-            if pauseDuringMeetings { checkMeetingStatus() }
-            checkIdleStatus()
+        } else if wasInMeeting {
+            Log.info("Meeting mode left")
+            wasInMeeting = false
         }
 
-        switch state {
-        case .paused:
-            break
-
-        case .working:
-            let now = Date()
-            updateWorkingCountdown(now: now)
-            updateImminentFlag()
-            if remainingSeconds <= 0 {
-                startBreak(countWorkSession: true)
-            }
-
-        case .onBreak:
-            let now = Date()
-            let elapsed = now.timeIntervalSince(breakStartTime)
-            if elapsed >= breakGracePeriod {
-                if isInGracePeriod {
-                    isInGracePeriod = false
-                    graceAnimTask?.cancel()
-                    graceAnimTask = nil
-                }
-                graceProgress = 1
-                if breakDeadline == nil {
-                    breakDeadline = TimerRules.deadline(from: now, seconds: remainingSeconds)
-                }
-                if let breakDeadline {
-                    remainingSeconds = TimerRules.remainingSeconds(deadline: breakDeadline, now: now)
-                }
-                // Rotate by wall-clock time rather than an exact countdown
-                // value, which a delayed tick could otherwise skip.
-                if let nextBreakTipDate, now >= nextBreakTipDate, remainingSeconds > 0 {
-                    breakTip = L10n.randomBreakTip(excluding: breakTip)
-                    self.nextBreakTipDate = now.addingTimeInterval(20)
-                }
-                if remainingSeconds <= 0 {
-                    endBreak()
-                }
-            }
+        // The timer keeps running during a meeting while working — no pause.
+        // A meeting only gets out of the way of a break.
+        apply {
+            $0.meetingStatusChanged(isInMeeting: meetingDetector.isInMeeting, now: Date())
         }
-    }
-
-    /// Progressive reminders: during the last minute, flag the menu-bar
-    /// hourglass and play the soft chime once on entry (including after resume).
-    private func updateImminentFlag() {
-        let imminent = TimerRules.isImminent(
-            remaining: remainingSeconds,
-            enabled: progressiveReminders,
-            isWorking: state == .working
-        )
-        if imminent && !isBreakImminent {
-            Log.info("Break impending: \(remainingSeconds)s left")
-            if !muteSounds { NSSound(named: "Tink")?.play() }
-        }
-        isBreakImminent = imminent
     }
 
     // MARK: - Fullscreen Detection
@@ -548,146 +559,5 @@ class TimerManager: ObservableObject {
             }
         }
         return false
-    }
-
-    private func startBreak(countWorkSession: Bool) {
-        // Check for meeting immediately before showing break overlay
-        if pauseDuringMeetings {
-            meetingDetector.check()
-            if meetingDetector.isInMeeting {
-                Log.info("Break overlay suppressed: meeting in progress")
-                secondsBeforePause = 0
-                workDeadline = nil
-                isBreakImminent = false
-                state = .paused
-                pauseReason = .breakPending
-                return
-            }
-        }
-
-        if countWorkSession {
-            // Count only naturally completed work, not the manual "break now".
-            workSessionsCompleted += 1
-        }
-        // Deliberately does NOT reset `skipStreak` here: clearing it when a
-        // voluntary break starts would let the nudge be dodged and would also
-        // lose the information that the user keeps skipping. It is cleared in
-        // `endBreak()` only, i.e. once a break is actually taken.
-        isLongBreak =
-            countWorkSession
-            && TimerRules.isLongBreak(
-                sessionsCompleted: workSessionsCompleted,
-                every: longBreakEvery
-            )
-        activeBreakTotalSeconds = TimerRules.breakTotalSeconds(
-            isLong: isLongBreak,
-            shortSeconds: settings.breakSeconds,
-            longSeconds: settings.longBreakSeconds
-        )
-
-        let now = Date()
-        remainingSeconds = activeBreakTotalSeconds
-        state = .onBreak
-        isEndingBreak = false
-        isBreakImminent = false
-        workDeadline = nil
-        breakStartTime = now
-        breakDeadline =
-            now
-            .addingTimeInterval(breakGracePeriod)
-            .addingTimeInterval(TimeInterval(activeBreakTotalSeconds))
-        nextBreakTipDate = now.addingTimeInterval(breakGracePeriod + 20)
-        isInGracePeriod = true
-        graceProgress = 0
-        breakTip = L10n.randomBreakTip(excluding: breakTip)
-        startGraceAnimation()
-
-        if isFrontmostAppFullscreen() {
-            overlayManager.showCompactBreakOverlay(timerManager: self)
-            Log.info("Break overlay triggered: compact overlay (fullscreen app detected)")
-        } else {
-            overlayManager.showBreakOverlay(timerManager: self)
-            Log.info("Break overlay triggered: full overlay (work timer expired)")
-        }
-
-        Log.info(
-            "Break started: \(isLongBreak ? "long" : "short") \(activeBreakTotalSeconds)s (session #\(workSessionsCompleted), manual=\(!countWorkSession))"
-        )
-        if !muteSounds { NSSound(named: "Glass")?.play() }
-    }
-
-    private func endBreak() {
-        guard !isEndingBreak else { return }
-        isEndingBreak = true
-        Log.info("Break overlay closed: timeout completed")
-        graceAnimTask?.cancel()
-        graceAnimTask = nil
-        skipStreak = 0
-        if !muteSounds { NSSound(named: "Blow")?.play() }
-        overlayManager.dismissWithAnimation { [weak self] in
-            guard let self else { return }
-            // During the 0.45s fade-out something else may already have taken
-            // over (a meeting interrupt paused the timer, the user skipped, or
-            // the system woke) — only restart work if the break is still ours.
-            guard self.state == .onBreak else { return }
-            self.beginWorking(seconds: self.workDurationSeconds)
-        }
-    }
-
-    private func startGraceAnimation() {
-        graceAnimTask?.cancel()
-        graceAnimTask = Task { [weak self] in
-            guard let self else { return }
-            let start = Date()
-            while !Task.isCancelled {
-                let elapsed = Date().timeIntervalSince(start)
-                if elapsed >= self.breakGracePeriod { break }
-                let progress = min(1.0, elapsed / self.breakGracePeriod)
-                await MainActor.run { [weak self] in
-                    self?.graceProgress = progress
-                }
-                try? await Task.sleep(nanoseconds: 50_000_000)  // 50 ms
-            }
-            if !Task.isCancelled {
-                await MainActor.run { [weak self] in
-                    self?.graceProgress = 1
-                }
-            }
-        }
-    }
-
-    private func checkMeetingStatus() {
-        meetingDetector.check()
-
-        if meetingDetector.isInMeeting {
-            if !wasInMeeting {
-                Log.info("Meeting mode entered (\(meetingDetector.meetingSource ?? "unknown"))")
-                wasInMeeting = true
-            }
-            // Timer keeps running during meetings when working — no pause.
-            // A meeting interrupts a break; the user can skip one themselves,
-            // so this is only about getting out of the way.
-            if state == .onBreak {
-                Log.info("Break interrupted by meeting")
-                overlayManager.dismissOverlay()
-                beginWorking(seconds: workDurationSeconds)
-                secondsBeforePause = remainingSeconds
-                workDeadline = nil
-                state = .paused
-                pauseReason = .meeting
-            }
-        } else {
-            if wasInMeeting {
-                Log.info("Meeting mode left")
-                wasInMeeting = false
-            }
-            if state == .paused && pauseReason == .breakPending {
-                // Meeting ended with break pending — short countdown then break
-                beginWorking(seconds: postMeetingBreakDelay)
-            } else if state == .paused && pauseReason == .meeting {
-                // Meeting ended (break was interrupted), resume
-                resume()
-            }
-        }
     }
 }

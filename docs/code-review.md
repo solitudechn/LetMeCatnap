@@ -448,3 +448,22 @@ deseven 维护」。
 
 `TimerManager` 没有自动化测试，这是全项目最该补的一块，但它需要先把决策逻辑从 AppKit 里
 拆出来（审计报告 9.2 给了两条路线）。发第一个 Sparkle 版本之前不动结构。
+
+---
+
+## 第十三轮：状态机搬进 `ICHRCore`（2026-10-28 午）
+
+第十二轮留下的 P1 是「`TimerManager` 零测试」。用户选择「要做就做最好」，于是没有只抽一小块
+决策表，而是把整个状态机搬了出来。详见
+[`docs/audit-2026-10-28.md`](audit-2026-10-28.md) 第十节。
+
+- 新增 `core/SessionState.swift`：三态机 + 四个暂停原因 + 长短休息 + 跳过计数 + 会议状态。
+  每个转换 `(事件, now) -> [SessionEffect]`，不碰 AppKit、不建 `Timer`、不读时钟、不写日志。
+- `src/TimerManager.swift` 从 691 行降到 563 行，只剩时钟、系统通知、遮罩、声音、日志、
+  动画与引导语轮换。`perform(_:)` 是唯一执行副作用的地方。
+- 对外接口与 `@Published` 语义不变，两个 SwiftUI 遮罩与 `AppDelegate` **一行没改**。
+- 新增 `SessionStateTests` 35 项，总数 39 → **74**。
+
+一个副产品：写测试时发现设置变更原本有两个入口（`configChanged` 与
+`meetingPausingDisabled`），测试里立刻撞上「该调哪个」的歧义。已合并成唯一入口——
+所有能把计时器卡住的设置必须在一处一起考虑。
