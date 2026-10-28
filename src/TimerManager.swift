@@ -478,10 +478,11 @@ class TimerManager: ObservableObject {
         if countWorkSession {
             // Count only naturally completed work, not the manual "break now".
             workSessionsCompleted += 1
-        } else {
-            // Voluntarily taking a break satisfies the progressive reminder.
-            skipStreak = 0
         }
+        // Deliberately does NOT reset `skipStreak` here. Clearing it when a
+        // voluntary break *starts* let the user dodge a mandatory break with
+        // "Take a Break Now" + Skip. The streak is cleared in `endBreak()`
+        // instead, i.e. only once a break is actually taken.
         let every = longBreakEvery
         isLongBreak = countWorkSession && every > 0 && workSessionsCompleted % every == 0
         activeBreakTotalSeconds = isLongBreak ? longBreakSeconds : breakDurationSeconds
