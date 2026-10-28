@@ -79,6 +79,7 @@ public enum LocKey: String, CaseIterable, Sendable {
     case secondsFormat
     case aboutFormat
     case quitFormat
+    case ok
 
     // Menu bar countdown
     case breakCountdown

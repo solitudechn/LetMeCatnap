@@ -17,7 +17,9 @@ enum StringTable {
         .takeBreakNow: Translation("Take a Break Now", "立即休息"),
         .workInterval: Translation("Work Interval", "工作时长"),
         .breakDuration: Translation("Break Duration", "休息时长"),
-        .pauseDuringMeetings: Translation("Pause During Meetings", "会议中自动暂停"),
+        // The switch does not pause the work countdown — a running session keeps
+        // running. What it holds back is the break overlay itself.
+        .pauseDuringMeetings: Translation("Hold Breaks in Meetings", "会议中不弹休息"),
         .pauseTrigger: Translation("Pause When", "暂停时机"),
         .triggerLockScreen: Translation("Screen Locks", "锁屏时"),
         .triggerIdle: Translation("Idle for 5 Minutes", "空闲 5 分钟时"),
@@ -38,6 +40,7 @@ enum StringTable {
         .secondsFormat: Translation("%ld sec", "%ld 秒"),
         .aboutFormat: Translation("About %@", "关于 %@"),
         .quitFormat: Translation("Quit %@", "退出 %@"),
+        .ok: Translation("OK", "好"),
 
         // ── Menu bar countdown ──────────────────────────────────────
         .breakCountdown: Translation("Break %@", "休息 %@"),

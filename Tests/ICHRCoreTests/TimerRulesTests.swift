@@ -19,7 +19,7 @@ final class TimerRulesTests: XCTestCase {
     func testShortAndLongBreakBounds() {
         XCTAssertEqual(TimerRules.shortBreakSeconds(1), 5)
         XCTAssertEqual(TimerRules.shortBreakSeconds(20), 20)
-        XCTAssertEqual(TimerRules.shortBreakSeconds(9999), 599)
+        XCTAssertEqual(TimerRules.shortBreakSeconds(9999), 600)
         XCTAssertEqual(TimerRules.longBreakSeconds(1), 60)
         XCTAssertEqual(TimerRules.longBreakSeconds(900), 900)
         XCTAssertEqual(TimerRules.longBreakSeconds(99999), 3600)

@@ -83,31 +83,15 @@ struct CompactBreakOverlayView: View {
                         .animation(.easeInOut(duration: 0.4), value: timerManager.breakTip)
                 }
 
-                // Escape hint (non-clickable — mouse passes through to fullscreen app)
-                if timerManager.showsSkipButton {
-                    HStack(spacing: 8) {
-                        Text(L10n.t(.skip))
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.5))
-                        Text(L10n.t(.skipKeys))
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.25))
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 8)
-                    .background(.white.opacity(0.08), in: Capsule())
-                    .overlay(Capsule().stroke(.white.opacity(0.1), lineWidth: 0.5))
+                // The panel is click-through, so nothing here can be clicked.
+                // This used to draw the same capsule as the full overlay's Skip
+                // button, which read as a button that did nothing when pressed.
+                // Plain text, one line, always: Escape is the only way out.
+                Text(L10n.t(.escapeToDismiss))
+                    .font(.system(size: 12, weight: .regular))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white.opacity(0.32))
                     .opacity(appeared ? 1 : 0)
-                    .accessibilityElement(children: .combine)
-                } else {
-                    // The button is hidden, but Escape still ends the break —
-                    // say so, otherwise the panel looks like a dead end.
-                    Text(L10n.t(.escapeToDismiss))
-                        .font(.system(size: 11, weight: .regular))
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.white.opacity(0.3))
-                        .opacity(appeared ? 1 : 0)
-                }
 
                 // A nudge after repeated skips — advisory only, Escape works too.
                 if timerManager.showsSkipHint {

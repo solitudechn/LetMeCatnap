@@ -4,9 +4,41 @@
 审查范围：`src/` 全部源码、`build.sh`、`Info.plist`、`README.md`
 （后续轮次已扩展到 `core/`、`Tests/`、`scripts/`、`.github/`）
 
-> **阅读提示**：本文是按轮次追加的审查日志，记录的是「当时」的结论。
-> 前几轮判定的若干问题已被后续轮次修复或推翻（已在正文用删除线标出），
-> 判断项目当前状态请看文末最新的「第十二轮」与 [`docs/audit-2026-10-28.md`](audit-2026-10-28.md)。
+> **阅读提示**：本文是按轮次追加的审查日志，记录的是「当时」的结论。前几轮判定的
+> 问题大多已被后续轮次修复或推翻（正文用删除线标出并注明去向）。**要看项目当前状态，
+> 只看下面的「当前状态」一节**，不必按顺序读全文。
+>
+> 早先另有一份 `docs/audit-2026-10-28.md`，越写越长且前六节结论全部作废（它讲的
+> `UpdateManager`、`1.0.5`、「bundle id 跟随上游」都已不存在），已于第十三轮末删除，
+> 其中仍然有效的条目并入下面这一节。
+
+---
+
+## 当前状态（截至 2026-10-28，第十四轮末）
+
+**可以发布。** 编译器、79 项单元测试、文案校验、lint、打包链路在本机全部通过；
+发布链路（含 appcast 签名）已用 `Info.plist` 的公钥实测验签。
+
+### 需要人做一次的事
+
+| 事项 | 说明 |
+|---|---|
+| `SPARKLE_ED_PRIVATE_KEY` secret | 私钥在 `~/.config/icanhazrepose/sparkle_ed25519_private.key`，须整份粘进仓库 secret。没配的话 release 工作流会**故意失败**，不会发出一个无法自动更新的版本 |
+| v1.1.0 手动升级一次 | bundle id 变了，1.0.x 里的旧更新器会拒绝替换。从 1.1.0 起恢复自动更新 |
+| 两张界面截图 | `assets/menu.png`、`assets/break-overlay.png` 仍是 1.0.x 的界面。本机进程没有「屏幕录制」权限，`screencapture` 返回 `could not create image from display` |
+
+### 已知限制（都不阻塞发版）
+
+| # | 事项 | 说明 |
+|---|---|---|
+| 1 | `TimerManager` 的「管道层」无自动化测试 | `Timer` 是否每秒触发、`perform` 是否把 effect 映射到正确的窗口/声音。能下沉的规则已全部下沉（`shouldPoll`、`SessionConfig(settings:)`、`postMeetingBreakDelaySeconds`），剩下靠端到端实跑验证 |
+| 2 | `workMinutesRange` 上限 120，菜单只到 90 | 老用户若存过 120，菜单栏会出现 `120:00` 这种三位数 |
+| 3 | 全屏判定看窗口尺寸，不看前台应用 | 后台放着全屏视频也会让遮罩切成紧凑面板 |
+| 4 | 日志目录固定 `~/Library/Logs/iCanHazRepose/` | 1.0.x 与 1.1.0 并存期间两边会写进同一个文件 |
+| 5 | 公证顺序仍是「先打包后公证」 | 无证书时不生效；启用签名前须改成「公证 → staple → 重新打包」，见 `docs/releasing.md` |
+| 6 | Sparkle 弹窗在 `LSUIElement` 应用里的前台行为未验证 | 只有第一次真实更新能验证。第一版发出去后请留意窗口是否被压在其他应用后面 |
+| 7 | `release.yml` 的 `Publish` 只 `--clobber` 资产，不更新正文 | 想改发布说明只能去网页改，或删了重发 |
+| 8 | 从 ad-hoc 切到 Developer ID 的那一版仍需手动安装 | 签名身份变了，Sparkle 会拒绝替换；那一版发布说明里要写明 |
 
 ---
 
@@ -341,7 +373,7 @@ x86_64 会覆盖先跑的 arm64——`lipo` 直接报 "no eligible inputs"。
 
 ## 第九轮：全项目审计（2026-10-28）
 
-完整报告见 [`docs/audit-2026-10-28.md`](audit-2026-10-28.md)。摘要：
+（完整报告原在 `docs/audit-2026-10-28.md`，已删除；摘要如下。）
 
 ### 修复
 1. **自动检查更新从未真正触发**：定时器首次回调在启动 24 小时后，菜单栏应用很少连续运行那么久。
@@ -356,7 +388,7 @@ x86_64 会覆盖先跑的 arm64——`lipo` 直接报 "no eligible inputs"。
   并在文首加了「以最新轮次为准」的阅读提示。
 - README 补上休息引导语与渐进式提醒，并把「Escape 永远可退出」修正为
   「除非关闭『允许跳过休息』」。
-- 新增 `docs/audit-2026-10-28.md`：完整问题清单（含未修项与理由）。
+- ~~新增 `docs/audit-2026-10-28.md`：完整问题清单。~~（该文件已删除，有效条目并入文首「当前状态」。）
 
 ### 仍未处理（详见审计报告）
 - 安装更新失败无提示；公证顺序倒置；zip 符号链接未校验；
@@ -403,7 +435,7 @@ x86_64 会覆盖先跑的 arm64——`lipo` 直接报 "no eligible inputs"。
 
 留了一个需要你决定的问题：关掉「允许跳过休息」后，完整遮罩既没有 Esc 也没有按钮，
 还会吞掉全屏幕的点击，屏幕最长被锁 10 分钟——与「Esc 随时可退出」的原则冲突。
-详见 [`docs/audit-2026-10-28.md`](audit-2026-10-28.md) 第八节。
+（当时记在已删除的审计报告第八节。）
 
 **你当场拍板：Esc 永远可用。** 已实施——热键无条件注册，`skipBreak(viaKeyboard:)`
 把键盘路径和按钮路径分开；设置项改名「显示跳过按钮 / Show Skip Button」（存储键不变，
@@ -415,8 +447,7 @@ x86_64 会覆盖先跑的 arm64——`lipo` 直接报 "no eligible inputs"。
 ## 第十二轮：逐文件复审（2026-10-28 中午）
 
 前两轮是「按主题查」，这轮把 47 个受控文件**逐个**通读了一遍，包含 README、`.roorules`、
-`.env.example`、两个工作流和全部文档。14 处已修，另有 1 项结构性问题待拍板；完整清单见
-[`docs/audit-2026-10-28.md`](audit-2026-10-28.md) 第九节。
+`.env.example`、两个工作流和全部文档。14 处已修，另有 1 项结构性问题待拍板；完整清单当时记在审计报告第九节（该文件已删除，有效条目并入文首「当前状态」）。
 
 ### 真问题（不只是整洁）
 
@@ -454,8 +485,7 @@ deseven 维护」。
 ## 第十三轮：状态机搬进 `ICHRCore`（2026-10-28 午）
 
 第十二轮留下的 P1 是「`TimerManager` 零测试」。用户选择「要做就做最好」，于是没有只抽一小块
-决策表，而是把整个状态机搬了出来。详见
-[`docs/audit-2026-10-28.md`](audit-2026-10-28.md) 第十节。
+决策表，而是把整个状态机搬了出来。详见下文。当时的完整说明在审计报告第十节（该文件已删除）。
 
 - 新增 `core/SessionState.swift`：三态机 + 四个暂停原因 + 长短休息 + 跳过计数 + 会议状态。
   每个转换 `(事件, now) -> [SessionEffect]`，不碰 AppKit、不建 `Timer`、不读时钟、不写日志。
@@ -467,3 +497,79 @@ deseven 维护」。
 一个副产品：写测试时发现设置变更原本有两个入口（`configChanged` 与
 `meetingPausingDisabled`），测试里立刻撞上「该调哪个」的歧义。已合并成唯一入口——
 所有能把计时器卡住的设置必须在一处一起考虑。
+
+---
+
+## 第十四轮：设计 / 实现 / 使用三层检查（2026-10-28 中午）
+
+这一轮先删掉了 `docs/audit-2026-10-28.md`。那份文件长到十节，而前三节讲的
+`UpdateManager`、`1.0.5`、「bundle id 跟随上游」全都已经不存在——留着它只会误导人。
+仍然有效的条目并入了文首的「当前状态」。然后对全部 47 个受控文件按三个层面重看了一遍。
+
+### 设计层面
+
+1. **设置变更靠调用点手动通知，已经漏了两个。** `setBreakDuration` 和
+   `setPomodoroPreset` 只写了 `Settings`，没有通知 `TimerManager`——于是改成 10 分钟休息
+   之后，下次休息仍然是旧时长，直到重启或改了别的设置。根因不是"少写两行"，而是
+   "每个设置都要记得通知一次"这个模式本身。改为 `TimerManager` 订阅
+   `Settings.objectWillChange`，三个 `xxxSettingChanged()` 里删掉两个（`pauseDuringMeetings`
+   保留，因为它还要重置会议检测器）。实测：改值后 **1 毫秒**配置更新（见文末验证）。
+2. **配置映射写在 App target 里，测不到。** `TimerManager.config(from:)` 手工搬 8 个字段，
+   加一个设置项忘了映射不会有任何反应。移到 `SessionConfig.init(settings:)` 并加测试，
+   以后漏映射测试会红。
+3. **`postMeetingBreakDelay = 5` 是时间规则，却写在 `TimerManager`。** 移到 `TimerRules`。
+4. **番茄"关闭"会把长休息时长改成 60 秒。** `setLongBreak(every: 0, seconds: 0)` 的
+   `seconds` 被 clamp 成 60，而菜单把"关闭"编码为 tag 0，于是算出的 `rhythmTag = 60`，
+   与任何预设都不匹配——子菜单里一个勾都不显示。改为 `every == 0` 时不动秒数，
+   菜单侧关闭时只匹配 tag 0。
+
+### 实现层面
+
+5. **休息时长上限 599，菜单里有 600。** 选「10 分钟」会存成 9 分 59 秒，且该菜单项因为
+   tag 不相等永远不打勾。上限改为 600（README 本来写的就是 20 秒–10 分钟）。
+6. **开机启动失败被吞掉。** `try? currentlyEnabled ? unregister() : register()` 之后无条件
+   记一行「changed to X」——系统拒绝时用户看到菜单没变、日志还说成功了。改为 `do/catch`，
+   失败写 ERROR 并弹窗说明原因。
+7. **光标可能永久变手形。** 跳过按钮的 hover 用 `NSCursor.push()`/`pop()`，若面板在鼠标
+   悬停时被关掉，`onHover(false)` 不会来，push 就留在栈上，整个系统的光标都变手形。
+   改为 `set()`，不需要配对。
+8. **状态栏每秒重建 `NSImage`。** 常驻进程每秒一次符号渲染加无障碍更新，多数时候内容
+   根本没变。加一个「图标 + 标题 + 无障碍标签」的比较，只在真变化时动按钮。
+9. `Updater` 里 `key?.isEmpty != false` 改成 `?? true`：等价，但不用想两秒。
+
+### 使用层面
+
+10. **「会议中自动暂停」这句文案是错的。** 会议从不暂停工作计时——它只挡休息，
+    `SessionState` 的注释也写着这是本应用的意义所在。改为「会议中不弹休息 /
+    Hold Breaks in Meetings」。
+11. **紧凑面板画了一个像按钮、却点不动的胶囊。** 那个面板是点击穿透的，胶囊却和全屏
+    遮罩上的真按钮长得一模一样，用户点它只会以为卡住了。改为一律显示一行纯文字
+    「按 Esc 退出」——在那个面板里键盘本来就是唯一出路。
+12. **README 的命令与实际不一致**：`swift format lint -r` 少了 `--strict`（那就永远不会
+    因格式失败），"copy check" 是 "localization check" 的笔误。
+13. **README 说「tap the ring」，但紧凑面板点不了。** 两处都补上了「全屏遮罩上」的限定。
+
+### 验证
+
+```text
+swift build                                   Build complete
+swift test --filter ICHRCoreTests             79 tests, 0 failures（76 + 3 新增）
+swift format lint --recursive --strict        0 problems
+python3 scripts/check-l10n.py                 OK (64 keys / 10 tips / 12 UI files)
+bash -n build.sh / YAML / plutil              OK
+./build.sh ci                                 10/10
+codesign --verify --deep --strict             valid + satisfies its Designated Requirement
+appcast 重放（私钥签名 → Info.plist 公钥验签） VALID，version 1.1.0
+```
+
+最关键的一条靠实跑拿到。改设置的那条链路跨了三层（菜单 → `Settings` → 订阅 → 状态机），
+单元测试只能覆盖最后一段，所以用一个临时的 DEBUG 钩子跑了一次，日志为：
+
+```text
+12:33:41.781  VERIFY: setting break duration to 45s from code
+12:33:41.782  VERIFY: settings.breakSeconds is now 45
+12:33:41.782  VERIFY: session config break is now 30     ← 同步读还是旧值（预期）
+12:33:41.783  Settings applied: work=20min, break=45s, … ← 1ms 后订阅生效
+```
+
+钩子跑完即删除，用户设置已还原（`breakSeconds=30`）。

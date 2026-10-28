@@ -15,6 +15,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     /// throws a window at someone who just installed it.
     private var showsWelcome = false
 
+    /// What the status item currently shows. The title is refreshed every
+    /// second; comparing against this lets a no-op tick cost nothing.
+    private struct StatusBarState: Equatable {
+        var icon: String
+        var title: String
+        var description: String
+    }
+    private var lastStatusState: StatusBarState?
+
     /// Boolean preferences, encoded as menu tags so one action can toggle them.
     private enum BoolSetting: Int, CaseIterable {
         case pauseDuringMeetings
@@ -385,8 +394,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
             item.state = item.tag == settings.breakSeconds ? .on : .off
         }
 
-        // Pomodoro rhythm checkmark — both values must match a preset
-        let rhythmTag = settings.longBreakEvery * 10_000 + settings.longBreakSeconds
+        // Pomodoro rhythm checkmark — both values must match a preset.
+        // With the rhythm off, `longBreakSeconds` is meaningless, so only the
+        // "Off" preset (tag 0) may match; otherwise nothing would be checked.
+        let rhythmTag =
+            settings.longBreakEvery == 0
+            ? 0
+            : settings.longBreakEvery * 10_000 + settings.longBreakSeconds
         for item in pomodoroMenu.items {
             item.state = item.tag == rhythmTag ? .on : .off
         }
@@ -483,9 +497,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         // countdown is hidden outright when "Hide Timer in Menu Bar" is on — so
         // the label carries the state, not just the icon.
         let description = "\(AppConstants.appName) — \(timerManager.menuBarText)"
+        let title = settings.hideMenuBarTimer ? "" : " \(timerManager.menuBarText)"
+
+        // This runs once a second for the lifetime of the process, and building
+        // an `NSImage` from a symbol costs real work. Only touch the button when
+        // what it should show has actually changed.
+        let snapshot = StatusBarState(icon: icon, title: title, description: description)
+        guard snapshot != lastStatusState else { return }
+        lastStatusState = snapshot
+
         let button = statusItem.button
         button?.image = NSImage(systemSymbolName: icon, accessibilityDescription: description)
-        button?.title = settings.hideMenuBarTimer ? "" : " \(timerManager.menuBarText)"
+        button?.title = title
         button?.setAccessibilityLabel(description)
         button?.toolTip = description
     }
@@ -508,7 +531,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     @objc private func setWorkInterval(_ sender: NSMenuItem) {
         Log.info("Work interval changed to \(sender.tag) min")
         settings.setWorkMinutes(sender.tag)
-        timerManager.workDurationSettingChanged()
     }
 
     @objc private func setBreakDuration(_ sender: NSMenuItem) {
@@ -526,7 +548,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     @objc private func setPauseTrigger(_ sender: NSMenuItem) {
         guard let trigger = PauseTrigger(rawValue: sender.tag) else { return }
         settings.setPauseTrigger(trigger)
-        timerManager.pauseTriggerSettingChanged(trigger)
         Log.info("Pause trigger changed to \(trigger)")
     }
 
@@ -561,9 +582,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
 
     @objc private func toggleLaunchAtLogin() {
         let currentlyEnabled = SMAppService.mainApp.status == .enabled
-        let newStatus = !currentlyEnabled
-        try? currentlyEnabled ? SMAppService.mainApp.unregister() : SMAppService.mainApp.register()
-        Log.info("Launch at login changed to \(newStatus)")
+        do {
+            if currentlyEnabled {
+                try SMAppService.mainApp.unregister()
+            } else {
+                try SMAppService.mainApp.register()
+            }
+            Log.info("Launch at login \(currentlyEnabled ? "disabled" : "enabled")")
+        } catch {
+            // This used to be `try?` followed by an unconditional "changed to…"
+            // log line: when the system refused the registration the menu simply
+            // never changed and nothing said why.
+            Log.error("Launch at login could not be changed: \(error.localizedDescription)")
+            let alert = NSAlert()
+            alert.messageText = L10n.t(.launchAtLogin)
+            alert.informativeText = error.localizedDescription
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: L10n.t(.ok))
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
     }
 
     @objc private func showAbout() {

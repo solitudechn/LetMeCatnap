@@ -53,7 +53,7 @@ The break reminder also respects full screen apps. If you're watching a movie or
 6. Lock your screen and step away — the timer pauses, and unlocks into a fresh cycle
    (reminders → pause when: lock screen, idle, either, or never)
 7. One minute before a break the menu bar icon turns into an hourglass and chimes softly, so the overlay is never a surprise
-8. During the break you get a short tip ("look 20 feet away", "roll your shoulders") instead of a ticking clock — the countdown fades out after three seconds, tap the ring if you want it back
+8. During the break you get a short tip ("look 20 feet away", "roll your shoulders") instead of a ticking clock — on the full-screen overlay the countdown fades out after three seconds; click the ring to bring it back. (The small panel used over full-screen apps keeps its countdown visible, because it is click-through and there would be no way to recall it.)
 
 <div align="center">
   <img src="assets/menu.png" alt="iCanHazRepose menu" width="280"/>
@@ -75,7 +75,7 @@ Most break apps pause on keyboard inactivity — but "no keyboard for two minute
 
 If you never lock your screen, **Reminders → Pause When** offers the idle-based behaviour instead: pause only (`Idle for 5 Minutes`), both signals (`Screen Locks or Idle`), or never pause automatically. Idle is opt-in because it is the noisy one — five minutes without input is the threshold, so reading a document is no longer mistaken for leaving.
 
-The break screen hides its countdown after three seconds and puts the guidance front and centre — staring at a ticking number is the opposite of resting your eyes. Tap the ring to see the time left. **Escape always closes a break** — a reminder should never be able to trap you. *Reminders → Show Skip Button* only decides whether the on-screen Skip button is there.
+The break screen hides its countdown after three seconds and puts the guidance front and centre — staring at a ticking number is the opposite of resting your eyes. Click the ring on the full-screen overlay to see the time left again. **Escape always closes a break** — a reminder should never be able to trap you, and over a full-screen app Escape is the only way out (that panel is deliberately click-through, so the Skip button would be unreachable). *Reminders → Show Skip Button* only decides whether the on-screen Skip button is there.
 
 ## Install
 
@@ -132,7 +132,7 @@ Timing rules, the timer's state machine, settings and the string table live in t
 module so they can be tested without AppKit:
 
 ```
-./scripts/verify.sh                 # format lint + copy check + unit tests + shell syntax
+./scripts/verify.sh                 # format lint + localization + unit tests + shell syntax
 ```
 
 Individually:
@@ -140,7 +140,7 @@ Individually:
 ```
 swift test --filter ICHRCoreTests   # needs a full Xcode (XCTest)
 python3 scripts/check-l10n.py       # every key translated, no stray literals
-swift format lint -r src core Tests # style, config in .swift-format
+swift format lint --recursive --strict src core Tests
 ```
 
 All of them run in CI on every push.

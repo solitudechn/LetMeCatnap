@@ -41,6 +41,7 @@ class TimerManager: ObservableObject {
     let breakGracePeriod = TimerRules.breakGracePeriod
 
     private var timerCancellable: AnyCancellable?
+    private var settingsCancellable: AnyCancellable?
     private var tickCount = 0
     private var graceAnimTask: Task<Void, Never>?
     private var nextBreakTipDate: Date?
@@ -117,9 +118,10 @@ class TimerManager: ObservableObject {
 
     init(settings: Settings) {
         self.settings = settings
-        session = SessionState(config: Self.config(from: settings), now: Date())
+        session = SessionState(config: SessionConfig(settings: settings), now: Date())
 
         startTicking()
+        observeSettings()
         observeScreenLock()
 
         // A Lock Screen or display sleep while the app was still launching
@@ -201,45 +203,51 @@ class TimerManager: ObservableObject {
 
     // MARK: - Settings changes
 
-    func workDurationSettingChanged() {
-        applyConfigurationChange()
-    }
-
-    // Called when the user toggles "Pause During Meetings".
+    /// Called when the user toggles "Pause During Meetings".
+    ///
+    /// Only the side effect that is not a configuration change lives here; the
+    /// snapshot itself is pushed by `observeSettings()`.
     func pauseDuringMeetingsSettingChanged(enabled: Bool) {
         if !enabled {
             wasInMeeting = false
             meetingDetector.reset()
         }
-        applyConfigurationChange()
     }
 
-    // Called when the user picks a different pause trigger in the menu.
-    func pauseTriggerSettingChanged(_ trigger: PauseTrigger) {
-        applyConfigurationChange()
+    /// Keeps the session's configuration snapshot in step with `Settings`.
+    ///
+    /// Every setting used to need its own "tell the timer" call, and two of them
+    /// (break duration, pomodoro rhythm) simply never got one — the value was
+    /// stored and then ignored until the next unrelated change. Subscribing
+    /// removes the whole class of bug: whatever writes a preference, the session
+    /// hears about it.
+    private func observeSettings() {
+        settingsCancellable = settings.objectWillChange.sink { [weak self] _ in
+            // `objectWillChange` fires *before* the new value is stored, so the
+            // snapshot has to be taken on the next run loop turn.
+            DispatchQueue.main.async {
+                self?.applyConfigurationChange()
+            }
+        }
     }
 
     /// One path for every preference change: `SessionState` decides which of
     /// them can strand the timer, and does it in one place.
     private func applyConfigurationChange() {
-        apply { $0.configChanged(Self.config(from: settings), now: Date()) }
+        let next = SessionConfig(settings: settings)
+        let changed = next != session.config
+        apply { $0.configChanged(next, now: Date()) }
+        if changed {
+            // Worth a line: "I changed a setting and nothing happened" is the
+            // kind of report that is impossible to diagnose from the outside.
+            Log.info(
+                "Settings applied: work=\(next.workSeconds / 60)min, "
+                    + "break=\(next.shortBreakSeconds)s, "
+                    + "longEvery=\(next.longBreakEvery), "
+                    + "pauseTrigger=\(next.pauseTrigger)"
+            )
+        }
     }
-
-    private static func config(from settings: Settings) -> SessionConfig {
-        SessionConfig(
-            workSeconds: settings.workSeconds,
-            shortBreakSeconds: settings.shortBreakSeconds,
-            longBreakEvery: settings.longBreakEvery,
-            longBreakSeconds: settings.longBreakTotalSeconds,
-            progressiveReminders: settings.progressiveReminders,
-            showSkipButton: settings.showSkipButton,
-            pauseDuringMeetings: settings.pauseDuringMeetings,
-            pauseTrigger: settings.pauseTrigger,
-            postMeetingBreakDelay: postMeetingBreakDelay
-        )
-    }
-
-    private static let postMeetingBreakDelay = 5
 
     // MARK: - Transitions
 

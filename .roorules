@@ -20,7 +20,8 @@ Layout:
 - `build.sh` — modes: `dev` (debug, launches), `ci` (universal release artifacts, no upload),
   `dev-release`, `release`. It also embeds `Sparkle.framework` and fixes the rpath.
 - `.github/workflows/` — `ci.yml` on every push/PR, `release.yml` on a `v*` tag.
-- `docs/` — audit reports, the rolling code review log, and `releasing.md`.
+- `docs/` — `code-review.md` (rolling log; its "当前状态" section is the only part that
+  describes the present) and `releasing.md` (the maintainer's release manual).
 
 Verify before calling anything done:
 - `./scripts/verify.sh` — the whole gate (add `ICHR_SWIFT_FLAGS=--disable-sandbox` when
@@ -47,6 +48,10 @@ Rules of thumb:
   `TimerManager` instead is how this project once ended up with two copies of
   `showsSkipHint`, one tested and one shipped. If a decision needs AppKit to express, split it
   into "decide" (core) and "do" (app).
+- `TimerManager` subscribes to `Settings.objectWillChange` and rebuilds its `SessionConfig`
+  itself. Do **not** add a `xxxSettingChanged()` method or call one from the menu: that pattern
+  is how break duration and the pomodoro rhythm silently stopped working once a preference was
+  written without a matching call.
 - The bundle identifier has exactly one source: `Info.plist`. `build.sh` reads it for the
   ad-hoc signing requirement, `core/BundleIdentity.swift` mirrors it, and
   `BundleIdentityTests` fails if the two drift apart.

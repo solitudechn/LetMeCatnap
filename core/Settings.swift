@@ -181,11 +181,16 @@ public final class Settings: ObservableObject {
 
     public func setLongBreak(every: Int, seconds: Int) {
         let clampedEvery = TimerRules.clamp(every, to: TimerRules.longBreakEveryRange)
-        let clampedSeconds = TimerRules.clamp(seconds, to: TimerRules.longBreakSecondsRange)
         if clampedEvery != longBreakEvery {
             longBreakEvery = clampedEvery
             defaults.set(clampedEvery, forKey: Key.longBreakEvery)
         }
+        // With the rhythm switched off, `seconds` carries no meaning. Writing a
+        // clamped value anyway would store 60 while the menu encodes "off" as
+        // tag 0, so no preset would ever show a checkmark again.
+        guard every != 0 else { return }
+
+        let clampedSeconds = TimerRules.clamp(seconds, to: TimerRules.longBreakSecondsRange)
         if clampedSeconds != longBreakSeconds {
             longBreakSeconds = clampedSeconds
             defaults.set(clampedSeconds, forKey: Key.longBreakSeconds)

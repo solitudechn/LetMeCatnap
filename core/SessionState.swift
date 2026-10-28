@@ -73,7 +73,7 @@ public struct SessionConfig: Equatable, Sendable {
         showSkipButton: Bool = true,
         pauseDuringMeetings: Bool = true,
         pauseTrigger: PauseTrigger = .lockScreen,
-        postMeetingBreakDelay: Int = 5
+        postMeetingBreakDelay: Int = TimerRules.postMeetingBreakDelaySeconds
     ) {
         self.workSeconds = workSeconds
         self.shortBreakSeconds = shortBreakSeconds
@@ -84,6 +84,30 @@ public struct SessionConfig: Equatable, Sendable {
         self.pauseDuringMeetings = pauseDuringMeetings
         self.pauseTrigger = pauseTrigger
         self.postMeetingBreakDelay = postMeetingBreakDelay
+    }
+
+    /// Snapshot of everything the state machine cares about in `Settings`.
+    ///
+    /// Lives next to `SessionConfig` rather than in `TimerManager` for the same
+    /// reason the state machine does: a hand-written mapping in the app target
+    /// cannot be tested, so a newly added preference silently fails to reach the
+    /// machine. Here a test can assert the whole snapshot.
+    /// - Note: `Settings` is main-actor isolated, so reading a snapshot of it
+    ///   has to happen there too. The result is a plain value the machine can
+    ///   carry anywhere.
+    @MainActor
+    public init(settings: Settings) {
+        self.init(
+            workSeconds: settings.workSeconds,
+            shortBreakSeconds: settings.shortBreakSeconds,
+            longBreakEvery: settings.longBreakEvery,
+            longBreakSeconds: settings.longBreakTotalSeconds,
+            progressiveReminders: settings.progressiveReminders,
+            showSkipButton: settings.showSkipButton,
+            pauseDuringMeetings: settings.pauseDuringMeetings,
+            pauseTrigger: settings.pauseTrigger,
+            postMeetingBreakDelay: TimerRules.postMeetingBreakDelaySeconds
+        )
     }
 }
 

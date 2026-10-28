@@ -9,7 +9,10 @@ public enum TimerRules {
     // MARK: - Settings bounds
 
     public static let workMinutesRange = 1...120
-    public static let breakSecondsRange = 5...599
+    /// Ten minutes is offered in the menu, so the upper bound has to include it.
+    /// It used to stop at 599, which silently turned the "10 min" item into
+    /// 9:59 and left that menu item permanently un-checked.
+    public static let breakSecondsRange = 5...600
     public static let longBreakEveryRange = 0...12
     public static let longBreakSecondsRange = 60...3600
 
@@ -28,6 +31,10 @@ public enum TimerRules {
     /// How long the user must be back (seconds since last input) before an
     /// idle pause is lifted.
     public static let idleReturnSeconds: TimeInterval = 5
+
+    /// After a meeting ends, the overlay waits this long before appearing, so
+    /// it does not land in the same instant the call does.
+    public static let postMeetingBreakDelaySeconds = 5
 
     /// The app ticks every second, but meeting detection and the idle query are
     /// system calls that are throttled to this interval.

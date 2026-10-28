@@ -44,7 +44,7 @@ final class SettingsTests: XCTestCase {
         defaults.set(5, forKey: Settings.Key.longBreakSeconds)
         let settings = Settings(defaults: defaults)
         XCTAssertEqual(settings.workMinutes, 1)
-        XCTAssertEqual(settings.breakSeconds, 599)
+        XCTAssertEqual(settings.breakSeconds, 600)
         XCTAssertEqual(settings.longBreakEvery, 12)
         XCTAssertEqual(settings.longBreakSeconds, 60)
     }
@@ -53,8 +53,8 @@ final class SettingsTests: XCTestCase {
     func testSettersClampAndPersist() {
         let settings = Settings(defaults: defaults)
         settings.setBreakSeconds(9_999)
-        XCTAssertEqual(settings.breakSeconds, 599)
-        XCTAssertEqual(defaults.integer(forKey: Settings.Key.breakSeconds), 599)
+        XCTAssertEqual(settings.breakSeconds, 600)
+        XCTAssertEqual(defaults.integer(forKey: Settings.Key.breakSeconds), 600)
 
         settings.setWorkMinutes(0)
         XCTAssertEqual(settings.workMinutes, 1)
@@ -172,6 +172,64 @@ final class SettingsTests: XCTestCase {
         // hides the button), but existing installs must keep their choice, so
         // the key on disk must not change.
         XCTAssertEqual(Settings.Key.showSkipButton, "allowSkipBreak")
+    }
+
+    @MainActor
+    func testSessionConfigSnapshotsEverySetting() {
+        // The snapshot used to be hand-written inside `TimerManager`, where no
+        // test could see it — which is how break duration and the pomodoro
+        // rhythm stopped reaching the state machine unnoticed.
+        let settings = Settings(defaults: defaults)
+        settings.setWorkMinutes(25)
+        settings.setBreakSeconds(600)
+        settings.setLongBreak(every: 3, seconds: 900)
+        settings.setProgressiveReminders(false)
+        settings.setShowSkipButton(false)
+        settings.setPauseDuringMeetings(false)
+        settings.setPauseTrigger(.idle)
+
+        let config = SessionConfig(settings: settings)
+        XCTAssertEqual(config.workSeconds, 25 * 60)
+        XCTAssertEqual(config.shortBreakSeconds, 600)
+        XCTAssertEqual(config.longBreakEvery, 3)
+        XCTAssertEqual(config.longBreakSeconds, 900)
+        XCTAssertFalse(config.progressiveReminders)
+        XCTAssertFalse(config.showSkipButton)
+        XCTAssertFalse(config.pauseDuringMeetings)
+        XCTAssertEqual(config.pauseTrigger, .idle)
+        XCTAssertEqual(config.postMeetingBreakDelay, TimerRules.postMeetingBreakDelaySeconds)
+
+        // A later change has to show up in the next snapshot, otherwise the
+        // subscription in `TimerManager` would be refreshing stale values.
+        settings.setBreakSeconds(30)
+        XCTAssertEqual(SessionConfig(settings: settings).shortBreakSeconds, 30)
+    }
+
+    @MainActor
+    func testBreakDurationAcceptsTheTenMinutePreset() {
+        // The menu offers 10 minutes, so the clamp has to allow 600. It used to
+        // stop at 599, which made the item store 9:59 and never check itself.
+        let settings = Settings(defaults: defaults)
+        settings.setBreakSeconds(600)
+        XCTAssertEqual(settings.breakSeconds, 600)
+        XCTAssertEqual(Settings(defaults: defaults).breakSeconds, 600)
+    }
+
+    @MainActor
+    func testTurningPomodoroOffKeepsTheLongBreakLength() {
+        // "Off" is encoded as tag 0 and means "ignore the long-break length".
+        // Writing a clamped 60 over it would make the menu unable to match the
+        // Off item again, so the length is left untouched.
+        let settings = Settings(defaults: defaults)
+        settings.setLongBreak(every: 4, seconds: 900)
+        settings.setLongBreak(every: 0, seconds: 0)
+
+        XCTAssertEqual(settings.longBreakEvery, 0)
+        XCTAssertEqual(settings.longBreakSeconds, 900, "off must not rewrite the length")
+
+        let reloaded = Settings(defaults: defaults)
+        XCTAssertEqual(reloaded.longBreakEvery, 0)
+        XCTAssertEqual(reloaded.longBreakSeconds, 900)
     }
 
     @MainActor

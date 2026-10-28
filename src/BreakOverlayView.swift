@@ -156,11 +156,12 @@ struct BreakOverlayView: View {
                         .accessibilityLabel(L10n.t(.skip))
                         .accessibilityHint(L10n.t(.skipKeys))
                         .onHover { hovering in
-                            if hovering {
-                                NSCursor.pointingHand.push()
-                            } else {
-                                NSCursor.pop()
-                            }
+                            // `set` rather than `push`/`pop`: the panel can be
+                            // dismissed while the pointer is still over the
+                            // button, in which case `onHover(false)` never runs
+                            // and a pushed cursor would stick for the whole
+                            // system.
+                            (hovering ? NSCursor.pointingHand : NSCursor.arrow).set()
                         }
                     } else {
                         // The button can be hidden, but Escape always ends the

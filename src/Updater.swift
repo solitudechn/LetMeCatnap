@@ -37,7 +37,7 @@ final class Updater: NSObject, SPUUpdaterDelegate {
         let feed = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String ?? "<missing>"
         let key = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String
         Log.info("updater started (feed: \(feed), signing key: \(key == nil ? "MISSING" : "present"))")
-        if key?.isEmpty != false {
+        if key?.isEmpty ?? true {
             // Sparkle rejects every download without a signing key. Say so in the
             // log instead of letting the check fail with a generic error later.
             Log.error("updater: SUPublicEDKey is absent — automatic updates cannot be verified")
