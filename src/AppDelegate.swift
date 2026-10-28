@@ -15,8 +15,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
     /// throws a window at someone who just installed it.
     private var showsWelcome = false
 
-    /// What the status item currently shows. The title is refreshed every
-    /// second; comparing against this lets a no-op tick cost nothing.
+    /// What the status item currently shows.
+    ///
+    /// The three parts change at very different rates — the symbol a handful of
+    /// times an hour, the countdown every second — and only building the image
+    /// is expensive (`NSImage(systemSymbolName:)` rasterises). Keying a single
+    /// snapshot on all three, which is what this used to be, meant the image was
+    /// rebuilt on every single tick.
     private struct StatusBarState: Equatable {
         var icon: String
         var title: String
@@ -579,18 +584,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDele
         let description = "\(AppConstants.appName) — \(timerManager.menuBarText)"
         let title = settings.hideMenuBarTimer ? "" : " \(timerManager.menuBarText)"
 
-        // This runs once a second for the lifetime of the process, and building
-        // an `NSImage` from a symbol costs real work. Only touch the button when
-        // what it should show has actually changed.
+        // This runs once a second for the lifetime of the process, so each part
+        // is only written when that part actually changed: the text changes every
+        // second by design, the symbol almost never.
         let snapshot = StatusBarState(icon: icon, title: title, description: description)
         guard snapshot != lastStatusState else { return }
+        let previous = lastStatusState
         lastStatusState = snapshot
 
         let button = statusItem.button
-        button?.image = NSImage(systemSymbolName: icon, accessibilityDescription: description)
-        button?.title = title
-        button?.setAccessibilityLabel(description)
-        button?.toolTip = description
+        if previous?.icon != icon {
+            button?.image = NSImage(systemSymbolName: icon, accessibilityDescription: description)
+        }
+        if previous?.title != title {
+            button?.title = title
+        }
+        if previous?.description != description {
+            button?.setAccessibilityLabel(description)
+            button?.toolTip = description
+        }
     }
 
     // MARK: - Actions

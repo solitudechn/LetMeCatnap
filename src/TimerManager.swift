@@ -30,7 +30,11 @@ class TimerManager: ObservableObject {
     @Published private(set) var session: SessionState
 
     /// Progress of the overlay's fade-in, only used for the countdown's opacity.
-    @Published var isInGracePeriod = false
+    ///
+    /// Not published: nobody outside this class reads it (the views use
+    /// `graceProgress`), and publishing it only made every observer re-diff on
+    /// the two transitions per break.
+    private(set) var isInGracePeriod = false
     @Published var graceProgress: Double = 1
     /// Guidance shown on the break overlay; rotated while the break runs.
     @Published var breakTip: String = ""
@@ -66,9 +70,6 @@ class TimerManager: ObservableObject {
     var breakDurationSeconds: Int { settings.shortBreakSeconds }
     var pauseDuringMeetings: Bool { settings.pauseDuringMeetings }
     var muteSounds: Bool { settings.muteSounds }
-    var longBreakEvery: Int { settings.longBreakEvery }
-    var longBreakSeconds: Int { settings.longBreakTotalSeconds }
-    var progressiveReminders: Bool { settings.progressiveReminders }
 
     var menuBarText: String {
         switch session.phase {
