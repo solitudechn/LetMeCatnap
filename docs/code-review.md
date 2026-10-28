@@ -269,3 +269,41 @@ ad-hoc 包若不写这个 DR，DR 会退化成 cdhash，新旧版本必然不匹
 - 状态行为测试 **46 项**全过（新增：空闲阈值前后、恢复、组合触发、
   非锁屏触发时锁屏不暂停、屏亮但仍锁屏不恢复、切设置解除滞留暂停）。
 - Core 规则/设置断言 + `scripts/check-l10n.py`（78 组双语，79 处引用）通过。
+
+---
+
+## 本机 Xcode 真机验证（第八轮）
+
+装上完整 Xcode（27.1 / Swift 6.4）后，此前只能靠 CI 的三件事终于在本机跑通，
+并顺带查出两个发布链路的真实缺陷。
+
+### 已验证
+- `swift build -c release`：整个包编译通过（12 秒），**包含两个 SwiftUI 视图的真实宏展开**——
+  之前用 `ViewState` 桩做的类型检查不再是唯一依据。
+- `swift test`：**23 项 XCTest 全部通过**（此前本机无 XCTest，只能交给 CI）。
+- `./build.sh ci`：9 步全绿，产出 2.1 MB 的 universal `.app`、716 KB 的 `iCHR.zip`、
+  1.0 MB 的 `iCHR.dmg`。
+- 产物校验：`lipo` 双架构（x86_64 + arm64）；ad-hoc 签名带**显式 designated requirement**
+  `identifier "wtf.d7.icanhazrepose"`（自动更新依赖它，见第五轮）；DMG 挂载后含
+  `iCanHazRepose.app` + `Applications` 软链，`codesign --deep --strict` 通过。
+- 冒烟运行 6 秒：无崩溃、stdout 干净、日志正常落到 `~/Library/Logs/iCanHazRepose/`，
+  且真实用户数据上完成了 `pauseTrigger` 迁移（日志显示 `pauseTrigger=lockScreen`）。
+
+### 修复 1：通用二进制在 Swift 6 工具链上必然失败
+`build.sh` 原本从 `.build/arm64-apple-macosx/<config>/` 取二进制。新的 SwiftPM 把产物
+放到 `.build/out/Products/<Config>`，而且**两个 `--arch` 构建写同一个路径**，后跑的
+x86_64 会覆盖先跑的 arm64——`lipo` 直接报 "no eligible inputs"。
+改为 `swift build --show-bin-path` 询问真实路径，并在每次编译后暂存到
+`.build/stage/<arch>/`；取不到时回退旧布局。GitHub 的 macOS runner 迟早升级工具链，
+这个坑不修会以「发布流水线突然全线失败」的形式出现。
+
+### 修复 2：缺 create-dmg 时 DMG 被静默跳过
+原来 `command -v create-dmg` 失败就 `return 0`，但 Release 页面链接的是 `iCHR.dmg`。
+现在缺失或失败都回退 `hdiutil`，并在镜像里补一个 `Applications` 软链，使回退产物
+仍然可以拖拽安装。
+
+### 修复 3：Xcode 装了但 xcode-select 还在 CLT
+这正是本次本机踩到的：`swift --version` 能用，一编译就报
+`external macro implementation type 'SwiftUIMacros.StateMacro' could not be found`。
+`build.sh` 现在若发现 `DEVELOPER_DIR` 未设置且 `xcode-select` 指向 CLT，会自动选用
+最新的 `/Applications/Xcode*.app`（并打印所选路径）；一个 Xcode 都没有时给出明确警告。

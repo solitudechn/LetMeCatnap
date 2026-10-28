@@ -56,6 +56,28 @@ fi
 ICHR_VERSION="${ICHR_VERSION:-}"
 ICHR_VERSION="${ICHR_VERSION#v}"
 
+# ── Toolchain ────────────────────────────────────────────────────────
+# SwiftUI macros (@State and friends) only resolve against a full Xcode.
+# Command Line Tools alone fails with "external macro implementation type
+# 'SwiftUIMacros.StateMacro' could not be found", and `xcode-select` often still
+# points at CLT right after Xcode is installed. Pick the newest full Xcode here
+# rather than failing with that message.
+if [ -z "${DEVELOPER_DIR:-}" ]; then
+    if xcode-select -p 2>/dev/null | grep -q "CommandLineTools"; then
+        fullXcode=""
+        for candidate in /Applications/Xcode*.app/Contents/Developer; do
+            [ -d "$candidate" ] && fullXcode="$candidate"
+        done
+        if [ -n "$fullXcode" ]; then
+            DEVELOPER_DIR="$fullXcode"
+            export DEVELOPER_DIR
+            echo -e "  ${dimColor}toolchain: $DEVELOPER_DIR (xcode-select points at CLT)${noColor}" > "$TTY"
+        else
+            echo -e "  ${redColor}warning: only Command Line Tools found — SwiftUI macros need a full Xcode${noColor}" > "$TTY"
+        fi
+    fi
+fi
+
 # ── Determine signing & notarization ─────────────────────────────────
 can_sign=false
 can_notarize=false
@@ -164,17 +186,42 @@ do_clean_build() {
 }
 
 do_compile_arm64() {
-    swift build -c "$buildConfig" --arch arm64
+    compile_arch arm64
 }
 
 do_compile_x86_64() {
-    swift build -c "$buildConfig" --arch x86_64
+    compile_arch x86_64
+}
+
+# Recent SwiftPM releases changed the output layout: products now land in
+# `.build/out/Products/<Config>` instead of `.build/<arch>-apple-macosx/<config>`.
+# Both `--arch` runs also write to the *same* product path, so the arm64 binary
+# is gone by the time the x86_64 build finishes. Ask SwiftPM for the real path
+# and keep a per-arch copy, which works on old and new toolchains alike.
+compile_arch() {
+    local arch="$1"
+    swift build -c "$buildConfig" --arch "$arch"
+    local binDir
+    binDir=$(swift build -c "$buildConfig" --arch "$arch" --show-bin-path)
+    mkdir -p "$loc/.build/stage/$arch"
+    cp "$binDir/$name" "$loc/.build/stage/$arch/$name"
+}
+
+arch_binary() {
+    local arch="$1"
+    local staged="$loc/.build/stage/$arch/$name"
+    if [ -f "$staged" ]; then
+        printf '%s' "$staged"
+    else
+        # Fallback for older layouts, in case `--show-bin-path` was skipped.
+        printf '%s' "$loc/.build/$arch-apple-macosx/$buildConfig/$name"
+    fi
 }
 
 do_create_universal() {
     lipo -create \
-        "$loc/.build/arm64-apple-macosx/$buildConfig/$name" \
-        "$loc/.build/x86_64-apple-macosx/$buildConfig/$name" \
+        "$(arch_binary arm64)" \
+        "$(arch_binary x86_64)" \
         -output "$loc/dist/$name"
 }
 
@@ -183,7 +230,7 @@ do_create_bundle() {
     mkdir -p "$loc/dist/$name.app/Contents/Resources"
 
     if [ "$mode" = "dev" ]; then
-        cp "$loc/.build/arm64-apple-macosx/$buildConfig/$name" "$loc/dist/$name.app/Contents/MacOS/$name"
+        cp "$(arch_binary arm64)" "$loc/dist/$name.app/Contents/MacOS/$name"
     else
         cp "$loc/dist/$name" "$loc/dist/$name.app/Contents/MacOS/$name"
         rm "$loc/dist/$name"
@@ -225,33 +272,45 @@ do_create_zip() {
 }
 
 do_create_dmg() {
-    if ! command -v create-dmg >/dev/null 2>&1; then
-        echo "create-dmg not installed (brew install create-dmg) — skipping DMG"
-        echo "create-dmg not installed — DMG skipped" > "$TTY"
-        return 0
-    fi
     local dmgStaging="$loc/dist/dmg_staging"
     local dmgPath="$loc/dist/$shortName.dmg"
     rm -rf "$dmgStaging"
     mkdir -p "$dmgStaging"
     cp -R "$loc/dist/$name.app" "$dmgStaging/"
-    # create-dmg drives Finder over AppleScript to lay the window out, which
-    # fails on headless CI runners. Fall back to a plain (layout-less) image so
-    # a release build never dies on cosmetics.
-    if ! create-dmg \
-        --volname "$name" \
-        --volicon "$loc/res/main.icns" \
-        --background "$loc/res/dmg/bg.png" \
-        --window-pos 200 120 \
-        --window-size 640 520 \
-        --icon-size 128 \
-        --icon "$name.app" 192 350 \
-        --app-drop-link 448 350 \
-        "$dmgPath" \
-        "$dmgStaging"; then
-        echo "create-dmg failed — falling back to hdiutil"
-        echo "create-dmg failed, using hdiutil" > "$TTY"
-        rm -f "$dmgPath"
+
+    local created=false
+    if command -v create-dmg >/dev/null 2>&1; then
+        # create-dmg drives Finder over AppleScript to lay the window out, which
+        # fails on headless CI runners. Fall back to a plain (layout-less) image
+        # so a release build never dies on cosmetics.
+        if create-dmg \
+            --volname "$name" \
+            --volicon "$loc/res/main.icns" \
+            --background "$loc/res/dmg/bg.png" \
+            --window-pos 200 120 \
+            --window-size 640 520 \
+            --icon-size 128 \
+            --icon "$name.app" 192 350 \
+            --app-drop-link 448 350 \
+            "$dmgPath" \
+            "$dmgStaging"; then
+            created=true
+        else
+            echo "create-dmg failed — falling back to hdiutil"
+            echo "create-dmg failed, using hdiutil" > "$TTY"
+            rm -f "$dmgPath"
+        fi
+    else
+        # Missing create-dmg is not a reason to ship a release without a DMG:
+        # the release page links to it.
+        echo "create-dmg not installed — using hdiutil"
+        echo "create-dmg not installed, using hdiutil" > "$TTY"
+    fi
+
+    if [ "$created" = false ]; then
+        # The fallback has no window layout, so give it the one thing a plain
+        # image still needs: a drop target next to the app.
+        ln -sfn /Applications "$dmgStaging/Applications"
         hdiutil create -volname "$name" -srcfolder "$dmgStaging" \
             -ov -format UDZO "$dmgPath"
     fi

@@ -97,7 +97,13 @@ cd iCanHazRepose
 ./build.sh
 ```
 
-Requires Xcode 15+ and macOS 13+.
+Requires macOS 13+ and a full **Xcode** (Command Line Tools alone cannot expand
+the SwiftUI macros). If `xcode-select` still points at CLT after installing
+Xcode, `build.sh` picks the newest `/Applications/Xcode*.app` by itself.
+
+`./build.sh` builds a debug binary and launches it; `./build.sh ci` produces the
+same artifacts as a release (universal binary, `iCHR.zip`, `iCHR.dmg`) without
+uploading or launching anything.
 
 ## Tests
 
