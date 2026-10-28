@@ -160,6 +160,19 @@ tail -f ~/Library/Logs/iCanHazRepose/iCanHazRepose.log
 `~/Library/Logs/iCanHazRepose/iCanHazRepose.log`（超过 1 MB 自动滚动），
 反馈问题时请附上这个文件。
 
+## Known behaviour
+
+Two things that look like bugs but are not:
+
+- **A three-digit menu bar.** Work intervals accept up to 120 minutes internally, while the
+  menu only offers up to 90. A value stored by an older build therefore shows as `120:00`.
+  工作间隔内部允许到 120 分钟，菜单只提供到 90；旧版本存过 120 的话，菜单栏会显示成 `120:00`。
+- **The compact panel over a background video.** "Full screen" is decided by looking for a
+  window the size of a screen, not by asking which app is in front — a full-screen video
+  left running in the background counts too.
+  全屏判定看的是「有没有一个和屏幕一样大的窗口」，而不是「哪个应用在前台」，所以后台
+  放着的全屏视频也会让休息变成小面板。
+
 ## Localization / 界面语言
 
 The UI ships with **English** and **简体中文** and follows your system language by default. Override it any time from the menu bar: **Language / 语言 → 跟随系统 / English / 简体中文**. The change applies immediately — no restart needed.

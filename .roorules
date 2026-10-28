@@ -20,8 +20,9 @@ Layout:
 - `build.sh` — modes: `dev` (debug, launches), `ci` (universal release artifacts, no upload),
   `dev-release`, `release`. It also embeds `Sparkle.framework` and fixes the rpath.
 - `.github/workflows/` — `ci.yml` on every push/PR, `release.yml` on a `v*` tag.
-- `docs/` — `code-review.md` (rolling log; its "当前状态" section is the only part that
-  describes the present) and `releasing.md` (the maintainer's release manual).
+- `docs/` — `releasing.md` only: the maintainer's release manual and the known issues that
+  affect shipping. There is no running audit log — keep it that way; a file that accumulates
+  every review round ends up arguing against itself.
 
 Verify before calling anything done:
 - `./scripts/verify.sh` — the whole gate (add `ICHR_SWIFT_FLAGS=--disable-sandbox` when
@@ -31,6 +32,11 @@ Verify before calling anything done:
   Command Line Tools (otherwise the SwiftUI macros cannot be expanded).
 - Launch `dist/iCanHazRepose.app` and check `~/Library/Logs/iCanHazRepose/iCanHazRepose.log`
   after packaging changes — a missing `Sparkle.framework` or rpath shows up there immediately.
+  This is also the **only** check that covers `TimerManager.perform(_:)`: the effect → window /
+  sound / log mapping has no unit test (the state machine does). Change it, then run a real
+  cycle with a short interval and read the log.
+- `assets/menu.png` and `assets/break-overlay.png` are from the 1.0.x UI. Treat them as
+  placeholders until someone with screen-recording permission re-captures them.
 
 Rules of thumb:
 - Every user-visible string is a `LocKey` case plus an entry in `core/StringTable.swift`;

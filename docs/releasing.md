@@ -129,3 +129,13 @@ identifier 变了（`wtf.d7.icanhazrepose` → `io.github.solitudechn.icanhazrep
 | 装完新版本又提示更新 | `CFBundleVersion` 没随 tag 变化（工作流会用 tag 覆盖，本地包则看 Info.plist） |
 | 启动即崩、报 dyld 找不到 Sparkle | `build.sh` 的嵌入步骤被跳过，或 rpath 丢了 |
 | CI 里 `generate_appcast` 找不到 | `swift build` 没跑过，Sparkle 的二进制产物还没下载 |
+
+## 六、已知问题（不影响发版，但会咬人）
+
+| 事项 | 说明 |
+|---|---|
+| Sparkle 的更新窗口在 `LSUIElement` 应用里的前台行为未验证 | 应用平时是 `.accessory`（不进 Dock），Sparkle 弹窗时会自己激活；若窗口被压在其他应用后面，用户点「检查更新…」会觉得没反应。**只有第一次真实更新能验证**，第一版发出去后请留意 |
+| `Publish` 只 `--clobber` 资产，不更新 release 正文 | 想改发布说明只能去网页改，或删了重发 |
+| 公证顺序仍是「先打包后公证」 | 见第三节的「已知的顺序问题」。无证书时不生效 |
+| 从 ad-hoc 切到 Developer ID 的那一版要手动安装 | 签名身份变了，Sparkle 会拒绝替换；那一版发布说明里必须写明 |
+
