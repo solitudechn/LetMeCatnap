@@ -392,7 +392,7 @@ class AboutViewController: NSViewController {
         )
         sheetWindow.isReleasedWhenClosed = false
         sheetWindow.contentViewController = dialogVC
-        sheetWindow.title = L10n.updateAvailable
+        sheetWindow.title = L10n.softwareUpdate
 
         window.beginSheet(sheetWindow)
     }

@@ -168,3 +168,23 @@
 `AboutViewController.reloadForLanguageChange()`（移除子视图后重建，保留窗口尺寸与位置），
 `setLanguage` 时若窗口可见则同时更新窗口标题与内容。菜单、状态栏、休息遮罩本来就
 每秒重绘，切语言即时生效。
+
+### 复查（第五轮：发布链路与资源）
+
+逐行审完 `build.sh`、`ci.yml`、`release.yml`，并结合仓库文件清单核对：
+
+- 资源完整：`res/main.icns`、`res/ui/*.png`（4 个图标）、`res/dmg/bg*.png`、`assets/*`（README 引用）全部存在；`build.sh` 复制的文件与实际文件一一对应。
+- 步骤计数正确：`ci`/`release` 基础 9 步，签名 +1、公证 +3、验签 +1，与实际执行顺序一致（`set -euo pipefail` 下无漏步）。
+- 发版硬约束成立：Release 标题 `iCanHazRepose x.y.z`、资产 `iCHR.zip`（+`iCHR.dmg` 可选），`Verify artifacts` 会比对 `CFBundleVersion` 与 tag，`Publish` 对已存在的 tag 走 `--clobber` 上传。
+- `.gitignore` 覆盖 `dist/`、`.build/`、`*.log`、`.env`、`.workbuddy/`；工作区无残留产物。
+- 统一了更新弹窗标题：关于窗口改用 `L10n.softwareUpdate`（原为「发现更新」，与菜单侧「软件更新」不一致），删除随之不再使用的 `updateAvailable` 键。
+
+**已知限制（本次未改，需签名后才涉及）**：`build.sh` 先打 ZIP/DMG 再公证与 staple，
+因此包内的 `.app` 没有嵌入式公证票据，未联网的首启动可能被 Gatekeeper 拦。
+正确顺序应是「公证 ZIP → staple .app → 重新打包 ZIP/DMG」。当前未配证书，
+发布的是 ad-hoc 包，此问题不生效；将来启用公证时应一并调整。
+
+另一个设计说明（非遗漏）：`UpdateManager` 的签名校验依赖 `build.sh` 里
+`codesign -r="designated => identifier ..."` 写入的显式 designated requirement。
+ad-hoc 包若不写这个 DR，DR 会退化成 cdhash，新旧版本必然不匹配、自动更新永远失败。
+这条命令因此不是可选项。

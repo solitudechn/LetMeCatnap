@@ -198,7 +198,6 @@ extension L10n {
     static var skipThisVersion: String  { t("Skip this version", "跳过此版本") }
     static var later: String            { t("Later", "稍后") }
     static var update: String           { t("Update", "更新") }
-    static var updateAvailable: String  { t("Update Available", "发现更新") }
     static var softwareUpdate: String   { t("Software Update", "软件更新") }
     static var noChangelog: String      { t("No changelog available.", "暂无更新日志。") }
 
