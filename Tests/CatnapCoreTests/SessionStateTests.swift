@@ -118,6 +118,48 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(state.sessionsCompleted, 2)
     }
 
+    func testALongRestStartsAFreshCycle() {
+        var state = makeState(shortBreak: 20, longBreakEvery: 2, longBreak: 600)
+
+        let firstBreak = runToBreak(&state, from: start)
+        XCTAssertEqual(state.sessionsCompleted, 1)
+        let afterBreak = takeEntireBreak(&state, from: firstBreak)
+
+        // Back the next morning, not a few minutes later.
+        let nextMorning = afterBreak.addingTimeInterval(16 * 3600)
+        _ = state.restartTimer(now: nextMorning)
+        XCTAssertEqual(state.sessionsCompleted, 0, "a night away starts a new cycle")
+
+        // The stale count would have made this session the second one and
+        // handed out the long break before lunch; a fresh cycle does not.
+        runToBreak(&state, from: nextMorning)
+        XCTAssertFalse(state.isLongBreak)
+        XCTAssertEqual(state.sessionsCompleted, 1)
+    }
+
+    func testAShortGapKeepsTheCount() {
+        var state = makeState(shortBreak: 20, longBreakEvery: 4, longBreak: 600)
+
+        let firstBreak = runToBreak(&state, from: start)
+        let afterBreak = takeEntireBreak(&state, from: firstBreak)
+
+        // Three hours off is a long lunch, not a new day.
+        let afterLunch = afterBreak.addingTimeInterval(3 * 3600)
+        _ = state.restartTimer(now: afterLunch)
+        XCTAssertEqual(state.sessionsCompleted, 1)
+    }
+
+    func testALongRestAlsoForgivesTheSkipStreak() {
+        var state = makeState(shortBreak: 20)
+        let breakStarted = runToBreak(&state, from: start)
+        _ = state.skipBreak(viaKeyboard: true, now: breakStarted.addingTimeInterval(2))
+        XCTAssertEqual(state.skipStreak, 1)
+
+        // Being nudged about skips from yesterday would make no sense.
+        _ = state.restartTimer(now: breakStarted.addingTimeInterval(20 * 3600))
+        XCTAssertEqual(state.skipStreak, 0)
+    }
+
     func testBreakCountdownWaitsForTheGracePeriod() {
         var state = makeState(shortBreak: 30)
         let started = runToBreak(&state, from: start)

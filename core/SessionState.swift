@@ -151,11 +151,15 @@ public struct SessionState: Equatable {
 
     private var workDeadline: Date?
     private var breakDeadline: Date?
+    /// The last moment a work session started or ended. Used to tell "the user
+    /// paused for a bit" from "the user went home" — see `resetRhythmIfStale`.
+    private var lastActivityAt: Date?
 
     // MARK: - Init
 
     public init(config: SessionConfig = SessionConfig(), now: Date) {
         self.config = config
+        self.lastActivityAt = now
         remaining = max(0, config.workSeconds)
         workDeadline = TimerRules.deadline(from: now, seconds: remaining)
     }
@@ -435,6 +439,23 @@ public struct SessionState: Equatable {
 
     // MARK: - Transitions
 
+    /// A long absence is a reset, not a pause.
+    ///
+    /// `sessionsCompleted` used to only ever go up, so an app left running
+    /// overnight — which is the normal case for a menu bar app with "launch at
+    /// login" — carried yesterday's count into today: the long break could be
+    /// due before the first short one. Time away starts a fresh cycle.
+    ///
+    /// `skipStreak` goes with it: the nudge is about someone skipping breaks
+    /// *now*, and nobody wants to be told off for what they did before dinner.
+    private mutating func resetRhythmIfStale(now: Date) {
+        guard let lastActivityAt,
+            now.timeIntervalSince(lastActivityAt) >= TimerRules.pomodoroResetAfterSeconds
+        else { return }
+        sessionsCompleted = 0
+        skipStreak = 0
+    }
+
     private mutating func beginWork(
         seconds: Int,
         now: Date,
@@ -443,6 +464,8 @@ public struct SessionState: Equatable {
         // Never longer than one full session: a resumed pause hands over its
         // banked time, and that time must not exceed the configured interval.
         let duration = min(max(0, seconds), config.workSeconds)
+        resetRhythmIfStale(now: now)
+        lastActivityAt = now
         isFinishingBreak = false
         isLongBreak = false
         activeBreakTotal = 0
@@ -458,6 +481,7 @@ public struct SessionState: Equatable {
     }
 
     private mutating func beginBreak(countsAsSession: Bool, now: Date) -> [SessionEffect] {
+        lastActivityAt = now
         // The overlay would sit on top of the call; wait for it to end.
         if config.pauseDuringMeetings && isInMeeting {
             banked = 0

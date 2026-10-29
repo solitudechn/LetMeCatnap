@@ -36,6 +36,17 @@ public enum TimerRules {
     /// it does not land in the same instant the call does.
     public static let postMeetingBreakDelaySeconds = 5
 
+    /// A gap this long since the last work session starts a fresh pomodoro
+    /// cycle instead of continuing the old one.
+    ///
+    /// The count used to be a plain `sessionsCompleted % every`, which meant a
+    /// machine left running carried the count across days: the first long break
+    /// of a morning could be due before the first short one. Four hours is
+    /// longer than any break the app schedules and longer than lunch, but well
+    /// under an evening, so coming back after a night or a day off starts over
+    /// while a normal working day still builds up to its long break.
+    public static let pomodoroResetAfterSeconds: TimeInterval = 4 * 60 * 60
+
     /// The app ticks every second, but meeting detection and the idle query are
     /// system calls that are throttled to this interval.
     public static let pollIntervalSeconds = 5
