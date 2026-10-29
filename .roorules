@@ -21,13 +21,20 @@ Layout:
   from `res/icon-source.jpg`. Run it instead of editing the `.icns` by hand.
 - `build.sh` — modes: `dev` (debug, launches), `ci` (universal release artifacts, no upload),
   `dev-release`, `release`. It also embeds `Sparkle.framework` and fixes the rpath.
-- `.github/workflows/` — `ci.yml` on every push/PR, `release.yml` on a `v*` tag.
+- `.github/workflows/` — `release.yml` on a `v*` tag; `ci.yml` only on pull requests and
+  manual dispatch (a full macOS build is expensive and the release path runs the checks anyway).
 - `docs/` — `releasing.md` only: the maintainer's release manual and the known issues that
   affect shipping. There is no running audit log — keep it that way; a file that accumulates
   every review round ends up arguing against itself.
 - `README.md` is the English README and `README.zh-CN.md` the Chinese one. They are full
   translations of each other, not summaries: a change to one goes into the other in the same
-  commit. Keep Chinese out of `README.md` except for the language switcher label.
+  commit. Keep Chinese out of `README.md` except for the language switcher label and the app's
+  own name 「我要小喵一下」, which is a name and is not translated.
+- The README follows the usual GitHub shape: hero, one paragraph, a table of what this fork
+  changes against upstream, install, usage, known behaviour, development, license. That table is
+  the reason the fork exists — when a behaviour changes, change its row too. Keep long design
+  essays out; the answer belongs in a sentence, not four paragraphs. `README.md` links to
+  `README.zh-CN.md` and back.
 
 Verify before calling anything done:
 - `./scripts/verify.sh` — the whole gate (add `CATNAP_SWIFT_FLAGS=--disable-sandbox` when

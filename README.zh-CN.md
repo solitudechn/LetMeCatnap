@@ -6,164 +6,84 @@
   <a href="https://github.com/solitudechn/LetMeCatnap/releases/latest/download/LetMeCatnap.dmg">
     <img src="assets/download-button.svg" alt="下载 macOS 版">
   </a>
-  <p><sub>免费开源，需要 macOS 13 或更高版本。中文 / English 双语界面。</sub></p>
+  <p><sub>免费开源 · 需要 macOS 13 或更高 · 中文 / English</sub></p>
 
   [![Release](https://github.com/solitudechn/LetMeCatnap/actions/workflows/release.yml/badge.svg)](https://github.com/solitudechn/LetMeCatnap/actions/workflows/release.yml)
 
   <sub><a href="README.md">English</a></sub>
 </div>
 
-<br/>
-
 <div align="center">
   <img src="assets/break-overlay.png" alt="LetMeCatnap 休息界面" width="480"/>
 </div>
 
-<br/>
+LetMeCatnap 住在菜单栏里，倒数你的工作间隔，时间到了就把屏幕压暗，提醒你看看别处。你开会的时候它不打扰，休息开始之后也不会把你困住。名字就是「我要小喵一下」——干一会儿活，再让眼睛眯一下，也就是这么回事。
 
-<div align="center">
-  <a href="https://github.com/fikrikarim/repose">原始代码 Fikri Karim</a> ·
-  <a href="https://github.com/deseven/iCanHazRepose">上游作者 deseven</a> ·
-  <a href="https://github.com/solitudechn/LetMeCatnap">本项目</a>
-</div>
+## 和原版有什么不同
 
-<br/>
+它最初只是 [deseven/iCanHazRepose](https://github.com/deseven/iCanHazRepose) 的 fork，而那个项目又基于 [fikrikarim/repose](https://github.com/fikrikarim/repose)。会议检测、纯菜单栏的设计、全屏应用上方那块点击穿透的小面板，都来自上游。下面这些是本项目自己加的、或者有意改掉的：
 
-> **它起于一个 fork，后来长成了自己的应用。** LetMeCatnap 基于
-> [deseven/iCanHazRepose](https://github.com/deseven/iCanHazRepose)，加了中英双语界面，
-> 并有意改掉了几处行为（休息随时可以退出、暂停时机由你选、更新交给 Sparkle）。
-> 它有自己的名字、自己的 bundle id（`io.github.solitudechn.letmecatnap`）和签名的更新源，
-> 因此可以和原版并存，而不是覆盖它。这个构建的问题请提到这里，原版的问题请找上游。
-
-<br/>
-
-LetMeCatnap 住在菜单栏里，倒数你的工作间隔，时间到了就把屏幕压暗，提醒你看看别处。休息结束，下一轮自动开始。
-
-名字就是**「我要小喵一下」**——干一会儿活，再让眼睛眯一下，也就是这么回事。
-
-和其他休息提醒最大的不同：**它会发现你正在开会，然后安静地等到会议结束。** 不需要连日历，也不需要为每个应用单独配置——摄像头或麦克风被占用，它就知道你在通话。
-
-它同样尊重全屏应用。看电影或打游戏时，屏幕中央会出现一个小面板，不拦截任何操作，按 Esc 就能关掉。
-
-## 它是怎么工作的
-
-1. 设定工作间隔（5–90 分钟）和休息时长（20 秒–10 分钟）
-2. 菜单栏显示倒计时
-3. 时间到了，温和地提醒你把视线移开——需要的话也可以随时点「立即休息」
-4. 可选「番茄节奏」：每完成 N 轮工作安排一次长休息（手动休息不计入轮次）
-5. 正在通话时，休息会等到通话结束
-6. 锁屏离开，计时自动暂停；解锁后开始全新一轮（**提醒 → 暂停时机**：锁屏 / 空闲 / 两者 / 从不）
-7. 休息前一分钟，菜单栏图标变成沙漏并轻声提示，遮罩不会突然出现
-8. 休息时看到的是一句简短引导（「看向 6 米外」「收下巴」「转一转肩膀」），而不是跳动的数字——全屏遮罩上的倒计时三秒后淡出，点一下圆环可以叫回来。（全屏应用上方的那个小面板例外，它是点击穿透的，倒计时一直显示。）遮罩上还会写明这是哪种休息——「短休息 · 30 秒」或「长休息 · 15 分钟」——长休息换成青绿色，扫一眼就知道要不要坐回去。
-
-这些提示都是普通的用眼与工效学常识：20 秒远眺、收下巴、夹肩胛骨，以及「别掰脖子」。值得照做，但不算医疗建议。
-
-<div align="center">
-  <img src="assets/menu.png" alt="LetMeCatnap 菜单" width="280"/>
-</div>
-
-所有功能都在菜单里——暂停、继续、重新开始、全部设置。没有单独的首选项窗口。
-
-## 会议检测为什么真的有效
-
-大多数休息类应用会读你的日历，或者盯着某几个应用有没有在跑。这两种都很容易失效——日历不知道领导刚刚临时拉了个会，而「Zoom 开着」也不等于你在开会。
-
-LetMeCatnap 直接看硬件。用 CoreMediaIO 查摄像头有没有被占用，用 CoreAudio 查麦克风。如果有程序正在用它们，你多半是在通话，于是它就让路。
-
-所以它对你用 Zoom、腾讯会议、FaceTime、Teams、飞书，以及明年才出现的那个新应用都成立。零配置。
-
-## 计时什么时候会暂停
-
-多数休息类应用靠「键盘多久没动」来判断，但「两分钟没敲键盘」同样可以是在读文档——而读文档正是最需要提醒的时候。默认情况下，LetMeCatnap 等的是真正说明你离开了的信号：屏幕锁定，或显示器休眠。解锁之后是全新一轮，因为锁屏本身就是一次真正的休息。
-
-如果你从不锁屏，**提醒 → 暂停时机** 里还有基于空闲的选项：只在空闲时暂停（`空闲 5 分钟`）、两种信号都暂停（`锁屏或空闲`），或者从不自动暂停。空闲默认不开启，因为它最吵——五分钟没有输入就判定为离开，读文档就不会被误伤了。
-
-休息界面三秒后会把倒计时藏起来，把引导语放到正中间——盯着跳动的数字看，正好是把眼睛往坏处用。全屏遮罩上点一下圆环可以把剩余时间叫回来。**Esc 永远能结束一次休息**——提醒不该把人困住，而在全屏应用上方，Esc 是唯一的出路（那个小面板故意做成点击穿透，按钮根本点不到）。**提醒 → 显示跳过按钮** 只决定屏幕上那个按钮显不显示。
+|  | iCanHazRepose | LetMeCatnap |
+| --- | --- | --- |
+| 界面语言 | 只有英文 | 中英双语，默认跟随系统，也能在菜单里随时切换，不用重启 |
+| 自动更新 | 「检查更新…」是空实现 | Sparkle 2 + Ed25519 签名的订阅源，每天后台检查一次 |
+| 身份 | `wtf.d7.icanhazrepose` | `io.github.solitudechn.letmecatnap` 加独立更新源，可与原版并存，设置互不干扰 |
+| 番茄节奏 | 无 | 每 N 轮工作安排一次长休息；手动休息不计轮次；离开 4 小时后计数归零 |
+| 什么时候暂停 | 只有「空闲 5 分钟」一个开关 | 默认锁屏或显示器休眠，另有空闲、两者、从不 |
+| 休息界面 | 固定一句话 | 标明是哪种休息、还剩多久；长休息换青绿色；22 条轮换的工效学提示；倒计时淡出 |
+| 休息之前 | 无 | 提前一分钟沙漏图标加一声轻响 |
+| 代码结构 | 计时逻辑在 app target 里，没有测试 | 状态机抽到 `CatnapCore`，不依赖 AppKit 就能测（86 项测试） |
 
 ## 安装
 
-### 下载
-
-**稳定版**——去 [Releases](https://github.com/solitudechn/LetMeCatnap/releases) 页面下载。
-
-安装包没有做公证，所以首次启动可能被 Gatekeeper 拦下（提示「已损坏」或「无法验证开发者」）。清除一次隔离标记即可：
+去 [Releases](https://github.com/solitudechn/LetMeCatnap/releases) 页面下载 DMG。安装包没有做公证，所以首次启动可能被 Gatekeeper 拦下（提示「已损坏」或「无法验证开发者」）。清除一次隔离标记即可：
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/LetMeCatnap.app
 ```
 
-**开发版**——不随每次推送构建，需要时手动触发：打开
-[CI 工作流](https://github.com/solitudechn/LetMeCatnap/actions/workflows/ci.yml)，
-点 **Run workflow**，跑完从运行页面下载产物。
-*（只有想尝鲜或帮忙测试时才建议用）*
+也可以自己编译——见 [开发](#开发)。
 
-### 从源码构建
+## 它是怎么工作的
 
-```
-git clone https://github.com/solitudechn/LetMeCatnap.git
-cd LetMeCatnap
-./build.sh
-```
+- 设定工作间隔（5–90 分钟）和休息时长（20 秒–10 分钟）。其余全在菜单栏里：暂停、继续、重新开始、番茄节奏、所有设置，没有单独的首选项窗口。
+- 时间到了，屏幕压暗，你看到的是「该做点什么」，而不是一个跳动的数字。**Esc 永远能结束一次休息**——提醒不该把人困住。
+- **正在开会时，休息会等。** 检测直接看硬件：CoreMediaIO 查摄像头，CoreAudio 查麦克风。所以它对 Zoom、腾讯会议、FaceTime、Teams、飞书，以及明年才出现的那个新应用都成立，既不用连日历，也不用为每个应用单独配置。
+- **你离开，它就暂停。** 默认等的是屏幕锁定或显示器休眠，解锁之后是全新一轮。基于空闲的暂停需要手动开启——「五分钟没敲键盘」同样可以是在读文档，而读文档正是最需要提醒的时候。
+- **全屏应用不会被挡住。** 看电影或打游戏时，屏幕中央出现一个小面板，点击穿透，按 Esc 关掉。
 
-需要 macOS 13 以上，以及完整的 **Xcode**（只装 Command Line Tools 无法展开 SwiftUI 宏）。如果装完 Xcode 后 `xcode-select` 仍指向 CLT，`build.sh` 会自己挑最新的 `/Applications/Xcode*.app`。
+休息时的提示都是普通的用眼与工效学常识：20 秒远眺、收下巴、夹肩胛骨，以及「别掰脖子」。值得照做，但不算医疗建议。
 
-`./build.sh` 编译调试版并直接运行；`./build.sh ci` 产出与发布完全相同的产物（通用二进制、`LetMeCatnap.zip`、`LetMeCatnap.dmg`），但不上传、不启动。
+<div align="center">
+  <img src="assets/menu.png" alt="LetMeCatnap 菜单" width="280"/>
+</div>
 
 ## 更新
 
-更新交给 [Sparkle 2](https://sparkle-project.org)，不是自己手写的一套：
-
-- 订阅源是 `https://github.com/solitudechn/LetMeCatnap/releases/latest/download/appcast.xml`，所以「发一个 Release」就是发布更新的全部动作；
-- 每个更新包都带 Ed25519 签名，公钥写在 `Info.plist` 的 `SUPublicEDKey` 里，对不上 Sparkle 直接拒绝；
-- `/Applications` 不可写时 Sparkle 会弹管理员授权，而不是等应用退出之后才默默失败。
-
-后台每天检查一次，菜单里的「检查更新…」可以随时手动触发。跳过某个版本之后，Sparkle 不再拿它烦你。
-
-## 测试与检查
-
-时间规则、计时器状态机、设置和文案表都在 `CatnapCore` 模块里，所以不需要 AppKit 就能测：
-
-```
-./scripts/verify.sh                 # 格式检查 + 文案检查 + 单元测试 + shell 语法
-```
-
-分开跑（这几条用的是 `xcode-select` 当前指向的工具链，所以要么先
-`sudo xcode-select -s /Applications/Xcode.app`，要么加前缀
-`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`——Command Line Tools
-里既没有 XCTest 也没有 `swift format`，直接跑会报
-`unable to resolve module dependency: 'XCTest'`）：
-
-```
-swift test --filter CatnapCoreTests   # 需要完整 Xcode（XCTest）
-python3 scripts/check-l10n.py         # 每个键都有翻译，没有漏网的硬编码
-swift format lint --recursive --strict src core Tests
-```
-
-发版工作流在打包之前会把这几项全跑一遍，测试不过就不会生成安装包。CI 工作流
-不再随每次推送运行——想要一份不发布的构建，去 Actions 页面手动触发即可。
-
-## 排错
-
-应用会写一份滚动日志：`~/Library/Logs/LetMeCatnap/LetMeCatnap.log`——每次状态变化、每次检查更新、每次失败都在里面。觉得哪里不对，先看这个文件，提 issue 时也请附上它。
-
-```sh
-tail -f ~/Library/Logs/LetMeCatnap/LetMeCatnap.log
-```
+更新交给 [Sparkle 2](https://sparkle-project.org)，订阅源是 `https://github.com/solitudechn/LetMeCatnap/releases/latest/download/appcast.xml`，所以「发一个 Release」就是发布更新的全部动作。后台每天检查一次，菜单里的「检查更新…」可以随时手动触发；跳过某个版本之后，它不再拿那个版本烦你。每个更新包都带签名，公钥写在 `Info.plist` 的 `SUPublicEDKey` 里，对不上直接拒绝。
 
 ## 两个看起来像 bug 的行为
 
 - **菜单栏出现三位数。** 工作间隔内部允许到 120 分钟，菜单只提供到 90。旧版本存过 120 的话，菜单栏会显示成 `120:00`。
-- **后台放着全屏视频时会变成小面板。** 全屏判定看的是「有没有一个和屏幕一样大的窗口」，而不是「哪个应用在前台」，所以后台的全屏视频也会让休息变成小面板。
+- **后台放着全屏视频时会变成小面板。** 全屏判定看的是「有没有一个和屏幕一样大的窗口」，而不是「哪个应用在前台」。
 
-## 界面语言
+如果遇到别的怪事，先看日志：`~/Library/Logs/LetMeCatnap/LetMeCatnap.log` 记录了每次状态变化、每次检查更新和每次失败，提 issue 时也请附上它。
 
-界面自带 **中文** 和 **English**，默认跟随系统语言。随时可以在菜单栏切换：**语言 → 跟随系统 / English / 简体中文**。切换立即生效，不用重启。
+## 开发
 
-每一句面向用户的文字都是 [`core/L10n.swift`](core/L10n.swift) 里的一个 `LocKey`，两种语言的译文都在 [`core/StringTable.swift`](core/StringTable.swift)。写错键名是编译错误；漏翻、译文为空、占位符（`%@` / `%ld`）对不上，`StringTableTests` 会失败。
+```sh
+git clone https://github.com/solitudechn/LetMeCatnap.git
+cd LetMeCatnap
+./build.sh            # 编译调试版并直接运行
+./scripts/verify.sh   # 格式检查 + 文案检查 + 单元测试 + shell 语法
+```
 
-唯一的例外：Sparkle 自己的更新对话框跟随**系统**语言，而不是应用内的「语言」开关——它们来自框架内部，不读 `StringTable`。
+`./build.sh ci` 产出与发布完全相同的产物（通用二进制、`LetMeCatnap.zip`、`LetMeCatnap.dmg`），但不上传、不启动。
+
+需要完整的 **Xcode**：Command Line Tools 里既没有 XCTest 也没有 `swift format`。装完 Xcode 后 `xcode-select` 仍指向 CLT 的话，`build.sh` 会自己挑最新的 `/Applications/Xcode*.app`；直接跑 `swift test` / `swift format` 则需要先 `sudo xcode-select -s /Applications/Xcode.app`，或者加 `DEVELOPER_DIR=…` 前缀。
+
+时间规则、状态机、设置和文案表都在 `CatnapCore` 里，所以不需要 AppKit 就能测。每一句面向用户的文字都是 [`core/L10n.swift`](core/L10n.swift) 里的一个 `LocKey`，两种译文都在 [`core/StringTable.swift`](core/StringTable.swift)：写错键名是编译错误，漏翻、译文为空、占位符（`%@` / `%ld`）对不上则由测试拦下。发版工作流在打包之前会把所有检查跑一遍，测试不过就不会生成安装包。
 
 ## 许可证
 
 MIT，见 [LICENSE](LICENSE)。两位上游作者的版权声明原样保留，本应用的声明追加在其后。
-这三个名字也显示在关于窗口的 **作者 / 上游作者 / 原始代码** 里。
