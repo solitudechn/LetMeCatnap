@@ -268,16 +268,16 @@ jobs:
             echo
             # Any 2.x release can still be installed by someone coming from
             # 1.0.x, so the migration notice is keyed to the major version
-            # rather than to one exact tag.
+            # rather than to one exact tag. It is a separate section on
+            # purpose: "what changed in this version" is the commit list
+            # below, and 2.0.1 must not be labelled with 2.0.0's rename.
             if [ "${VERSION%%.*}" -ge 2 ] 2>/dev/null; then
-              echo "### 这个版本有什么变化 / What's new"
-              echo '- **改名为 LetMeCatnap**：应用名、图标、bundle id 都换了，可以和原版（iCanHazRepose）并存。'
-              echo '- **如果你还在 1.0.x：需要手动安装一次**（bundle id 改了，旧版更新器会拒绝替换）。设置会自动迁移。'
-              echo '- 更新改用 Sparkle：更新包带签名校验，下载或安装失败会明确提示，不再静默。'
-              echo '- 休息遮罩**随时可以用 Esc 退出**；菜单里的「允许跳过休息」改成了「显示跳过按钮」，只决定按钮显不显示。'
-              echo '- 关于窗口只保留本仓库的 GitHub 入口。'
+              echo "### 从 1.0.x 升级 / Upgrading from 1.0.x"
+              echo '- **需要手动安装一次**：bundle id 改了，1.0.x 的更新器会拒绝替换。设置会自动迁移。'
+              echo '- 2.0 以来的变化：改名为 LetMeCatnap（应用名、图标、bundle id）；更新改用 Sparkle，带签名校验，下载或安装失败会明确提示；休息遮罩随时可用 Esc 退出；关于窗口只保留本仓库的 GitHub 入口。'
               echo
             fi
+            echo "### 本版变化 / What's new in this version"
             echo "$CHANGES" | sed '/^$/d'
             echo
             echo "---"
