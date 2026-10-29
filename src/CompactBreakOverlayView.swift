@@ -95,7 +95,11 @@ struct CompactBreakOverlayView: View {
                     Text(typeLabel)
                         .font(.system(size: 22, weight: .medium, design: .rounded))
                         .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .opacity(appeared ? 1 : 0)
+                        // Same words the ring already announces.
+                        .accessibilityHidden(true)
 
                     Text(timerManager.breakTip.isEmpty ? L10n.t(.restHint) : timerManager.breakTip)
                         .font(.system(size: 13, weight: .regular))

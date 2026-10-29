@@ -194,7 +194,10 @@ enum StringTable {
             "Screen an arm's length away, top edge level with your eyes",
             "屏幕放在一臂远，上沿与视线齐平"
         ),
-        ("Keep your feet flat and stop crossing your legs", "双脚踩平，别跷二郎腿"),
+        (
+            "Elbows near 90 degrees and wrists flat — bend at the elbow, not the wrist",
+            "手肘约 90 度、手腕放平——弯的是手肘，不是手腕"
+        ),
         ("Drink a glass of water", "去喝一杯水"),
         (
             "Look out of the window until your eyes stop straining",

@@ -119,9 +119,7 @@ struct BreakOverlayView: View {
                     // time as a value instead of trying to describe the shape.
                     // It stays readable after the digits fade out visually.
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(
-                        timerManager.isLongBreak ? L10n.t(.longBreakTitle) : L10n.t(.timeToRest)
-                    )
+                    .accessibilityLabel(typeLabel)
                     .accessibilityValue(
                         L10n.t(.timeRemaining, TimerRules.formatTime(timerManager.remainingSeconds))
                     )
@@ -136,6 +134,8 @@ struct BreakOverlayView: View {
                             Text(typeLabel)
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.white.opacity(0.85))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
                         }
                         .padding(.horizontal, 13)
                         .padding(.vertical, 5)
@@ -143,6 +143,9 @@ struct BreakOverlayView: View {
                         .overlay(Capsule().stroke(accent.primary.opacity(0.45), lineWidth: 0.5))
                         .opacity(appeared ? 1 : 0)
                         .padding(.bottom, 2)
+                        // The ring already announces the type and the time left;
+                        // reading the same words twice makes VoiceOver chatter.
+                        .accessibilityHidden(true)
 
                         Text(timerManager.isLongBreak ? L10n.t(.longBreakTitle) : L10n.t(.timeToRest))
                             .font(.system(size: 38, weight: .medium, design: .rounded))

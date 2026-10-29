@@ -85,6 +85,16 @@ final class StringTableTests: XCTestCase {
         XCTAssertEqual(preset, "每 4 轮 · 15 分钟")
     }
 
+    func testBreakDurationPicksAReadableUnit() {
+        XCTAssertEqual(L10n.duration(seconds: 900, for: .chinese), "15 分钟")
+        XCTAssertEqual(L10n.duration(seconds: 900, for: .english), "15 min")
+        XCTAssertEqual(L10n.duration(seconds: 60, for: .chinese), "1 分钟")
+        XCTAssertEqual(L10n.duration(seconds: 30, for: .english), "30 sec")
+        // A 90 second break stays in seconds: "1.5 分钟" would be worse, and
+        // "1 分钟" would be a lie.
+        XCTAssertEqual(L10n.duration(seconds: 90, for: .chinese), "90 秒")
+    }
+
     func testTranslationPicksTheRequestedLanguage() {
         let pair = Translation("Skip", "跳过")
         XCTAssertEqual(pair.value(for: .english), "Skip")

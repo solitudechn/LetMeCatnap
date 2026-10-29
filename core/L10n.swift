@@ -223,10 +223,16 @@ public enum L10n {
     /// rather than turning into "1.5 分钟", because the overlay has room for
     /// one short phrase and no room for arithmetic.
     public static func duration(seconds: Int) -> String {
+        duration(seconds: seconds, for: current)
+    }
+
+    /// The same, for an explicit language. Used by tests, which need both
+    /// sides without changing the user's UI language.
+    public static func duration(seconds: Int, for language: Language) -> String {
         if seconds >= 60, seconds % 60 == 0 {
-            return t(.minutesFormat, seconds / 60)
+            return format(text(.minutesFormat, for: language), [seconds / 60])
         }
-        return t(.secondsFormat, seconds)
+        return format(text(.secondsFormat, for: language), [seconds])
     }
 
     /// "Long break · 15 分钟" — the badge above the overlay headline.
