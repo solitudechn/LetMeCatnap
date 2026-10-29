@@ -57,7 +57,9 @@ The break reminder also respects full screen apps. If you're watching a movie or
 5. If you're on a call, the break waits until you're done
 6. Lock your screen and step away — the timer pauses, and unlocking starts a fresh cycle (**Reminders → Pause When**: lock screen, idle, either, or never)
 7. One minute before a break the menu bar icon turns into an hourglass and chimes softly, so the overlay is never a surprise
-8. During the break you get a short tip ("look 20 feet away", "roll your shoulders") instead of a ticking clock — on the full-screen overlay the countdown fades out after three seconds; click the ring to bring it back. (The small panel used over full-screen apps keeps its countdown visible, because it is click-through and there would be no way to recall it.)
+8. During the break you get a short tip ("look 20 feet away", "chin tuck", "roll your shoulders") instead of a ticking clock — on the full-screen overlay the countdown fades out after three seconds; click the ring to bring it back. (The small panel used over full-screen apps keeps its countdown visible, because it is click-through and there would be no way to recall it.) The overlay also names the break — "Short break · 30 sec" or "Long break · 15 min" — and long breaks run in a teal accent, so one glance tells you whether to sit back down.
+
+The tips are ordinary ergonomics and eye-care advice: the 20-second distance rule, chin tucks, shoulder-blade squeezes, and a warning against cracking your neck. Worth doing; not medical treatment.
 
 <div align="center">
   <img src="assets/menu.png" alt="LetMeCatnap menu" width="280"/>

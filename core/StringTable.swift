@@ -86,6 +86,10 @@ enum StringTable {
             "Skipped a few times — this one is worth taking",
             "连跳几次了，这次休息一下会更好"
         ),
+        // Badge above the headline. The two breaks looked identical apart from
+        // a word in the title, which is easy to misread half awake.
+        .breakTypeShort: Translation("Short break", "短休息"),
+        .breakTypeLong: Translation("Long break", "长休息"),
 
         // ── Pomodoro rhythm ─────────────────────────────────────────
         .pomodoroRhythm: Translation("Pomodoro Rhythm", "番茄节奏"),
@@ -125,16 +129,80 @@ enum StringTable {
     ]
 
     /// Rotated one per break. Same order in both arrays.
+    ///
+    /// Written as things a physiotherapist or optometrist would actually say,
+    /// and kept to advice that holds up: no detox, no posture myths, and
+    /// nothing that claims to prevent a disease. The 20-second eye rule, chin
+    /// tucks, scapular squeezes and the warning against neck cracking are all
+    /// standard; the phrasing stays descriptive ("eases the load") rather than
+    /// promising an outcome.
     static let breakTips: [(en: String, zh: String)] = [
-        ("Look 20 feet away for 20 seconds", "看向约 6 米（20 英尺）外，持续 20 秒"),
-        ("Stand up and roll your shoulders", "站起来转一转肩膀"),
-        ("Take three slow, deep breaths", "慢慢深呼吸三次"),
+        ("Look 20 feet away for 20 seconds", "看向 6 米外，持续 20 秒"),
+        (
+            "Chin tuck: slide your chin straight back, hold 5 seconds, repeat 5 times",
+            "收下巴：下巴水平后移做出双下巴，保持 5 秒，重复 5 次"
+        ),
+        (
+            "Squeeze your shoulder blades together, hold 5 seconds, release",
+            "两侧肩胛骨往中间夹，保持 5 秒再放松"
+        ),
+        ("Roll your shoulders back and down, five times", "肩膀向后向下绕环，做 5 次"),
+        (
+            "Don't crack your neck — that sound is joint gas, not a tight muscle letting go",
+            "别掰脖子听响——那是关节里的气体，不是肌肉松开了"
+        ),
+        (
+            "Turn your head slowly left and right, stopping before it hurts",
+            "慢慢左右转头，到不舒服之前就停"
+        ),
+        ("Stand up and walk to the window", "站起来走到窗边"),
+        (
+            "Stand and do 10 heel raises to get the blood moving",
+            "站起来做 10 次提踵，帮血液回流"
+        ),
+        (
+            "Stretch your forearms: extend an arm, pull the fingers down, 15 seconds a side",
+            "前臂拉伸：伸直手臂，另一只手把手指往下压，每侧 15 秒"
+        ),
+        ("Open your chest in a doorway for 20 seconds", "站在门框里打开胸口，保持 20 秒"),
+        (
+            "Unclench your hands: open and close your fists 10 times",
+            "松开拳头，握紧再张开，做 10 次"
+        ),
+        (
+            "Shrug your shoulders to your ears, hold 3 seconds, then drop them",
+            "耸肩到耳朵，停 3 秒，然后一下放下来"
+        ),
+        ("Breathe in for 4 seconds, out for 6, five times", "吸气 4 秒、呼气 6 秒，重复 5 次"),
+        (
+            "Let your jaw hang loose, tongue resting behind your lower teeth",
+            "松开牙关，舌尖轻抵下牙后方"
+        ),
+        (
+            "Close your eyes for 20 seconds and let the tear film spread again",
+            "闭眼 20 秒，让泪膜重新铺满眼球"
+        ),
+        (
+            "Blink fully a few times — screen work cuts your blink rate roughly in half",
+            "完整地眨几次眼——盯着屏幕时眨眼频率大约减半"
+        ),
+        (
+            "Stand, hands on your lower back, lean back gently for 5 seconds",
+            "站起来手扶后腰，轻轻后仰 5 秒"
+        ),
+        (
+            "Screen an arm's length away, top edge level with your eyes",
+            "屏幕放在一臂远，上沿与视线齐平"
+        ),
+        ("Keep your feet flat and stop crossing your legs", "双脚踩平，别跷二郎腿"),
         ("Drink a glass of water", "去喝一杯水"),
-        ("Blink slowly and let your eyes relax", "缓慢眨眼，让眼睛放松"),
-        ("Look out of the window for a while", "看看窗外"),
-        ("Stretch your neck to both sides", "左右活动一下脖子"),
-        ("Unclench your jaw and soften your forehead", "松开下巴，舒展眉心"),
-        ("Shake out your hands and wrists", "甩甩手腕和手指"),
-        ("Walk a few steps", "起身走几步"),
+        (
+            "Look out of the window until your eyes stop straining",
+            "看看窗外，直到眼睛不再发紧"
+        ),
+        (
+            "Stand up for a moment — sitting is what stiffens hips and lower back",
+            "起身站一会儿——久坐才是髋和腰发僵的原因"
+        ),
     ]
 }

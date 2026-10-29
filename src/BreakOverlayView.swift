@@ -18,6 +18,30 @@ struct BreakOverlayView: View {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
 
+    /// Long breaks get a different accent, so the screen reads differently
+    /// before you have focused on any text. A 30 second break and a 15 minute
+    /// one used to look identical apart from one word in the headline, which is
+    /// exactly the word you cannot read when you are half awake.
+    private var accent: (primary: Color, secondary: Color) {
+        timerManager.isLongBreak
+            ? (
+                primary: Color(red: 0.32, green: 0.82, blue: 0.70),
+                secondary: Color(red: 0.55, green: 0.90, blue: 0.62)
+            )
+            : (
+                primary: Color(red: 0.40, green: 0.50, blue: 1.00),
+                secondary: Color(red: 0.60, green: 0.40, blue: 1.00)
+            )
+    }
+
+    /// "Long break · 15 分钟" — the type and the length, in one glance.
+    private var typeLabel: String {
+        L10n.breakTypeLabel(
+            isLong: timerManager.isLongBreak,
+            seconds: timerManager.currentBreakTotalSeconds
+        )
+    }
+
     var body: some View {
         ZStack {
             // Blurred dark background — semi-transparent
@@ -31,7 +55,7 @@ struct BreakOverlayView: View {
                     .fill(
                         RadialGradient(
                             colors: [
-                                Color(red: 0.3, green: 0.4, blue: 0.9).opacity(0.15),
+                                accent.primary.opacity(0.15),
                                 Color.clear,
                             ],
                             center: .center,
@@ -60,9 +84,9 @@ struct BreakOverlayView: View {
                             .stroke(
                                 AngularGradient(
                                     colors: [
-                                        Color(red: 0.4, green: 0.5, blue: 1.0).opacity(0.8),
-                                        Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.6),
-                                        Color(red: 0.4, green: 0.5, blue: 1.0).opacity(0.3),
+                                        accent.primary.opacity(0.8),
+                                        accent.secondary.opacity(0.6),
+                                        accent.primary.opacity(0.3),
                                     ],
                                     center: .center
                                 ),
@@ -105,6 +129,21 @@ struct BreakOverlayView: View {
                     .accessibilityAddTraits(.isButton)
 
                     VStack(spacing: 10) {
+                        HStack(spacing: 7) {
+                            Circle()
+                                .fill(accent.primary)
+                                .frame(width: 6, height: 6)
+                            Text(typeLabel)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.85))
+                        }
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(.white.opacity(0.07)))
+                        .overlay(Capsule().stroke(accent.primary.opacity(0.45), lineWidth: 0.5))
+                        .opacity(appeared ? 1 : 0)
+                        .padding(.bottom, 2)
+
                         Text(timerManager.isLongBreak ? L10n.t(.longBreakTitle) : L10n.t(.timeToRest))
                             .font(.system(size: 38, weight: .medium, design: .rounded))
                             .foregroundStyle(.white)

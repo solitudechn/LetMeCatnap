@@ -14,6 +14,30 @@ struct CompactBreakOverlayView: View {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
 
+    /// Same accent switch as the full overlay: long breaks are visibly a
+    /// different colour, not just a different word.
+    private var accent: (primary: Color, secondary: Color) {
+        timerManager.isLongBreak
+            ? (
+                primary: Color(red: 0.32, green: 0.82, blue: 0.70),
+                secondary: Color(red: 0.55, green: 0.90, blue: 0.62)
+            )
+            : (
+                primary: Color(red: 0.40, green: 0.50, blue: 1.00),
+                secondary: Color(red: 0.60, green: 0.40, blue: 1.00)
+            )
+    }
+
+    /// The panel is only 360×420, so the headline *is* the badge here: adding a
+    /// separate capsule row would push the tip and the Escape line out of the
+    /// window when the skip hint appears.
+    private var typeLabel: String {
+        L10n.breakTypeLabel(
+            isLong: timerManager.isLongBreak,
+            seconds: timerManager.currentBreakTotalSeconds
+        )
+    }
+
     var body: some View {
         ZStack {
             // Dark tint over the window's blur material (added in OverlayManager)
@@ -34,9 +58,9 @@ struct CompactBreakOverlayView: View {
                         .stroke(
                             AngularGradient(
                                 colors: [
-                                    Color(red: 0.4, green: 0.5, blue: 1.0).opacity(0.8),
-                                    Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.6),
-                                    Color(red: 0.4, green: 0.5, blue: 1.0).opacity(0.3),
+                                    accent.primary.opacity(0.8),
+                                    accent.secondary.opacity(0.6),
+                                    accent.primary.opacity(0.3),
                                 ],
                                 center: .center
                             ),
@@ -62,16 +86,14 @@ struct CompactBreakOverlayView: View {
                 // Same treatment as the full overlay: the arc is decorative, the
                 // remaining time is the information.
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(
-                    timerManager.isLongBreak ? L10n.t(.longBreakTitle) : L10n.t(.timeToRest)
-                )
+                .accessibilityLabel(typeLabel)
                 .accessibilityValue(
                     L10n.t(.timeRemaining, TimerRules.formatTime(timerManager.remainingSeconds))
                 )
 
                 VStack(spacing: 8) {
-                    Text(timerManager.isLongBreak ? L10n.t(.longBreakTitle) : L10n.t(.timeToRest))
-                        .font(.system(size: 24, weight: .medium, design: .rounded))
+                    Text(typeLabel)
+                        .font(.system(size: 22, weight: .medium, design: .rounded))
                         .foregroundStyle(.white)
                         .opacity(appeared ? 1 : 0)
 

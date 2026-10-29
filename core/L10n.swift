@@ -113,6 +113,8 @@ public enum LocKey: String, CaseIterable, Sendable {
     case skipKeys
     case showRemaining
     case skipHint
+    case breakTypeShort
+    case breakTypeLong
 
     // Pomodoro rhythm
     case pomodoroRhythm
@@ -214,6 +216,24 @@ public enum L10n {
     }
 
     // MARK: - Break guidance
+
+    /// A break length the way a person would say it: "15 分钟", "30 秒".
+    ///
+    /// Only whole minutes become minutes; a 90 second break stays "90 秒"
+    /// rather than turning into "1.5 分钟", because the overlay has room for
+    /// one short phrase and no room for arithmetic.
+    public static func duration(seconds: Int) -> String {
+        if seconds >= 60, seconds % 60 == 0 {
+            return t(.minutesFormat, seconds / 60)
+        }
+        return t(.secondsFormat, seconds)
+    }
+
+    /// "Long break · 15 分钟" — the badge above the overlay headline.
+    public static func breakTypeLabel(isLong: Bool, seconds: Int) -> String {
+        let name = isLong ? t(.breakTypeLong) : t(.breakTypeShort)
+        return "\(name) · \(duration(seconds: seconds))"
+    }
 
     /// Shown instead of the static hint while the break overlay is up.
     public static var breakTips: [String] {
