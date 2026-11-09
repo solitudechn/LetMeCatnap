@@ -46,7 +46,9 @@ concurrency:
 jobs:
   release:
     name: Build & publish
-    runs-on: macos-14
+    # macOS 14 images were retired on 2026-11-02. Follow the current GA image
+    # (macos-26 today) so a release never lands on a retired label again.
+    runs-on: macos-latest
     env:
       MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
       MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}

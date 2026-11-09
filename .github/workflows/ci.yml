@@ -19,7 +19,9 @@ concurrency:
 jobs:
   build:
     name: Build (universal)
-    runs-on: macos-14
+    # macOS 14 images were retired on 2026-11-02; jobs on that label are
+    # cancelled before a runner is even assigned.
+    runs-on: macos-latest
 
     steps:
       - name: Checkout
