@@ -35,7 +35,7 @@ full-screen apps come from there. What this build adds or deliberately changes:
 | Updates | `Check for Updates…` was a placeholder | Sparkle 2 with an Ed25519-signed feed, checked daily in the background |
 | Identity | `wtf.d7.icanhazrepose` | `io.github.solitudechn.letmecatnap` and its own feed, so it installs next to the original with separate settings |
 | Pomodoro rhythm | — | a long break every N sessions; manual breaks do not count; the counter resets after 4 hours away |
-| When it pauses | one switch: idle for 5 minutes | screen lock or display sleep by default, plus idle, either, or never |
+| When it pauses | one switch: idle for 5 minutes | screen lock or all displays sleeping by default, plus idle, either, or never |
 | Break screen | one fixed line | names the break and its length, long breaks in teal, 22 rotating ergonomics tips, countdown fades out |
 | Before a break | — | a minute ahead the icon turns into an hourglass and chimes |
 | Under the hood | timer logic in the app target, no tests | state machine in `CatnapCore`, tested without AppKit (86 tests) |
@@ -64,10 +64,12 @@ Or build it yourself — see [Development](#development).
   cameras, CoreAudio for microphones — so it works with Zoom, Meet, FaceTime,
   Teams, Slack huddles or whatever you use next year, with no calendar and no
   per-app setup.
-- **Step away and the timer pauses.** By default that means the screen locking or
-  the display sleeping; unlocking starts a fresh cycle. Idle-based pausing is
+- **Step away and the timer pauses.** By default that means the session locking or
+  *every* display sleeping; unlocking starts a fresh cycle. Idle-based pausing is
   opt-in, because "no keyboard for five minutes" also describes reading a document
-  — which is exactly when you need the reminder.
+  — which is exactly when you need the reminder. Closing the lid with an external
+  monitor attached does not count as leaving: the timer keeps running and a break
+  overlay follows whichever display is still lit.
 - **Full-screen apps are respected.** Over a film or a game a small click-through
   panel appears in the middle of the screen; Escape dismisses it.
 

@@ -306,6 +306,27 @@ public struct SessionState: Equatable {
         return beginWork(seconds: config.workSeconds, now: now)
     }
 
+    /// Re-evaluates a lock pause after the display set changed.
+    ///
+    /// Display sleep/unlock notifications are not a reliable pair: closing a
+    /// lid while an external monitor is in use produces a sleep notification
+    /// with no matching unlock, and a display reconfiguration can move the menu
+    /// bar to another screen without any lock notification at all. When the
+    /// session is demonstrably unlocked and a display is lit, there is nobody
+    /// to wait for — the pause is stale and has to be lifted.
+    public mutating func displayConfigurationChanged(
+        isScreenLocked: Bool,
+        hasActiveDisplay: Bool,
+        now: Date
+    ) -> [SessionEffect] {
+        guard phase == .paused, pauseCause == .locked,
+            !isScreenLocked, hasActiveDisplay
+        else { return [] }
+        var effects = beginWork(seconds: config.workSeconds, now: now)
+        effects.append(.automaticPauseLifted(.locked))
+        return effects
+    }
+
     public mutating func systemWake(now: Date) -> [SessionEffect] {
         switch phase {
         case .working:

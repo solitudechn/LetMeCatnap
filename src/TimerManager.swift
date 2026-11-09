@@ -50,6 +50,10 @@ class TimerManager: ObservableObject {
     private var graceAnimTask: Task<Void, Never>?
     private var nextBreakTipDate: Date?
     private var wasInMeeting = false
+    /// Consecutive polls that found the session unlocked with a display awake.
+    /// Two agreeing reads (~10 s) keep a race right after a real lock from
+    /// lifting a pause that is still valid.
+    private var unlockedDisplayPollCount = 0
 
     // Activity to prevent App Nap
     private var activity: NSObjectProtocol?
@@ -368,6 +372,7 @@ class TimerManager: ObservableObject {
         if TimerRules.shouldPoll(tickCount: tickCount) {
             if pauseDuringMeetings { checkMeetingStatus() }
             checkIdleStatus()
+            recheckStaleLockPause()
         }
 
         apply { $0.tick(now: Date()) }
@@ -420,11 +425,17 @@ class TimerManager: ObservableObject {
         }
     }
 
-    // MARK: - Screen lock (the only "user is away" signal we trust)
+    // MARK: - Screen lock and display configuration
 
     /// Locking is deliberate; idle time is not. Reading a long document leaves
     /// the keyboard untouched for minutes, and pausing on that would suppress
     /// the break exactly when it is most useful.
+    ///
+    /// A *display* sleeping is a different signal from the session locking.
+    /// On a laptop with an external monitor, closing the lid puts the built-in
+    /// panel to sleep while the external one stays lit and in use; there is no
+    /// matching wake or unlock for the closed panel. Treating that notification
+    /// as "away" used to leave the timer paused until the lid was opened again.
     private func observeScreenLock() {
         let distributed = DistributedNotificationCenter.default()
         distributed.addObserver(
@@ -432,31 +443,41 @@ class TimerManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in self?.handleScreenLocked() }
+            Task { @MainActor in self?.handleScreenLocked(source: "screen locked") }
         }
         distributed.addObserver(
             forName: .init("com.apple.screenIsUnlocked"),
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in self?.handleScreenUnlocked() }
+            Task { @MainActor in self?.handleScreenUnlocked(source: "Screen unlocked") }
         }
 
-        // Display sleep usually comes with the lock, and also means nobody is
-        // looking at the screen any more.
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.screensDidSleepNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in self?.handleScreenLocked() }
+            Task { @MainActor in self?.handleDisplaySleep() }
         }
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.screensDidWakeNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in self?.handleScreenUnlocked() }
+            Task { @MainActor in self?.handleScreenUnlocked(source: "Displays woke") }
+        }
+
+        // Opening or closing a lid, plugging in a monitor, and the menu bar
+        // moving between displays all reconfigure the display set. On a
+        // clamshell Mac this is often the *only* event that arrives when the
+        // built-in panel goes away, so it is where a stale pause gets fixed.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.handleDisplayConfigurationChange() }
         }
     }
 
@@ -472,21 +493,106 @@ class TimerManager: ObservableObject {
         return (session["CGSSessionScreenIsLocked"] as? Bool) ?? false
     }
 
-    private func handleScreenLocked() {
+    /// Displays that are awake rather than merely connected. `NSScreen.screens`
+    /// still lists the built-in panel of a closed laptop; `CGGetActiveDisplayList`
+    /// does not, so it is what tells a sleeping panel from one somebody is using.
+    var activeDisplayCountProvider: () -> Int = { TimerManager.activeDisplayCount() }
+
+    static func activeDisplayCount() -> Int {
+        var count: UInt32 = 0
+        guard CGGetActiveDisplayList(0, nil, &count) == .success else {
+            return NSScreen.screens.count
+        }
+        return Int(count)
+    }
+
+    private func handleScreenLocked(source: String = "screen locked") {
         guard session.phase == .working else { return }
         apply { $0.screenLocked(now: Date()) }
         if session.phase == .paused, session.pauseCause == .locked {
-            Log.info("Timer paused: screen locked (\(session.banked)s banked)")
+            unlockedDisplayPollCount = 0
+            Log.info("Timer paused: \(source) (\(session.banked)s banked)")
         }
     }
 
-    private func handleScreenUnlocked() {
+    /// A single display sleeping is usually just the lid closing in clamshell
+    /// mode. Only a locked session or *every* display being asleep means the
+    /// user actually left.
+    private func handleDisplaySleep() {
+        let isLocked = screenLockedProvider()
+        let active = activeDisplayCountProvider()
+        guard
+            TimerRules.shouldPauseForDisplaySleep(
+                isScreenLocked: isLocked,
+                activeDisplayCount: active
+            )
+        else {
+            Log.info(
+                "Display sleep ignored: session unlocked, \(active) display(s) still active"
+            )
+            return
+        }
+        handleScreenLocked(source: "all displays asleep")
+    }
+
+    private func handleScreenUnlocked(source: String = "Screen unlocked") {
         let wasLockedPaused = session.phase == .paused && session.pauseCause == .locked
         // Display wake fires before the unlock in most cases, so pass the real
         // lock state and let the state machine decide.
         apply { $0.screenUnlocked(isScreenLocked: screenLockedProvider(), now: Date()) }
         if wasLockedPaused && session.phase == .working {
-            Log.info("Screen unlocked — starting a full work session")
+            unlockedDisplayPollCount = 0
+            Log.info("\(source) — starting a full work session")
+        }
+    }
+
+    /// The display set changed. Judge a lock pause against the state *now*
+    /// rather than waiting for a wake/unlock notification that may belong to a
+    /// display which is closed.
+    private func handleDisplayConfigurationChange() {
+        let isLocked = screenLockedProvider()
+        let active = activeDisplayCountProvider()
+        let wasLockedPaused = session.phase == .paused && session.pauseCause == .locked
+        apply {
+            $0.displayConfigurationChanged(
+                isScreenLocked: isLocked,
+                hasActiveDisplay: active > 0,
+                now: Date()
+            )
+        }
+        if wasLockedPaused && session.phase == .working {
+            unlockedDisplayPollCount = 0
+            Log.info(
+                "Display change lifted a stale lock pause (\(active) active display(s))"
+            )
+        }
+    }
+
+    /// Notifications are not a reliable pair on a clamshell Mac: a lid closing
+    /// can produce a display sleep with no unlock, and a reconfiguration can be
+    /// missed entirely. If the session is unlocked and a display is awake, the
+    /// lock pause is stale — lift it even when no event ever arrived.
+    private func recheckStaleLockPause() {
+        guard session.phase == .paused, session.pauseCause == .locked else {
+            unlockedDisplayPollCount = 0
+            return
+        }
+        guard !screenLockedProvider(), activeDisplayCountProvider() > 0 else {
+            unlockedDisplayPollCount = 0
+            return
+        }
+        unlockedDisplayPollCount += 1
+        // Two agreeing reads: the lock notification and the CGSession flag are
+        // not updated atomically, so a single read could race with a real lock.
+        guard unlockedDisplayPollCount >= 2 else { return }
+        unlockedDisplayPollCount = 0
+        Log.info("Lock pause lifted: session unlocked with a live display (no unlock event seen)")
+        apply {
+            $0.displayConfigurationChanged(
+                isScreenLocked: false,
+                hasActiveDisplay: true,
+                now: Date()
+            )
         }
     }
 

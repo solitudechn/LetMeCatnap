@@ -317,6 +317,116 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(state.phase, .working, "nothing was paused, so there is nothing to resume")
     }
 
+    // MARK: - Display reconfiguration (closed lid with an external monitor)
+
+    /// A lid closing used to strand the timer in a lock pause waiting for an
+    /// unlock that could never arrive: the display that went to sleep was the
+    /// closed one, while the external monitor stayed lit and in use.
+    func testDisplayReconfigurationLiftsAStaleLockPause() {
+        var state = makeState(workSeconds: 1200)
+        _ = state.screenLocked(now: start.addingTimeInterval(30))
+
+        let effects = state.displayConfigurationChanged(
+            isScreenLocked: false,
+            hasActiveDisplay: true,
+            now: start.addingTimeInterval(35)
+        )
+
+        XCTAssertEqual(state.phase, .working)
+        XCTAssertEqual(state.remaining, 1200)
+        XCTAssertTrue(effects.contains(.automaticPauseLifted(.locked)))
+    }
+
+    func testResumedSessionActuallyKeepsCountingDown() {
+        var state = makeState(workSeconds: 1200)
+        _ = state.screenLocked(now: start.addingTimeInterval(300))
+        _ = state.displayConfigurationChanged(
+            isScreenLocked: false,
+            hasActiveDisplay: true,
+            now: start.addingTimeInterval(310)
+        )
+
+        _ = state.tick(now: start.addingTimeInterval(320))
+        XCTAssertEqual(state.remaining, 1190, "resuming has to leave a working deadline behind")
+    }
+
+    func testRepeatedDisplayChangesDoNotRestartTheSession() {
+        var state = makeState(workSeconds: 1200)
+        _ = state.screenLocked(now: start.addingTimeInterval(300))
+        _ = state.displayConfigurationChanged(
+            isScreenLocked: false,
+            hasActiveDisplay: true,
+            now: start.addingTimeInterval(310)
+        )
+
+        XCTAssertEqual(
+            state.displayConfigurationChanged(
+                isScreenLocked: false,
+                hasActiveDisplay: true,
+                now: start.addingTimeInterval(320)
+            ),
+            [],
+            "only the first reconfiguration lifts the pause"
+        )
+        XCTAssertEqual(state.remaining, 1200)
+    }
+
+    func testDisplayReconfigurationKeepsAGenuineLock() {
+        var state = makeState()
+        _ = state.screenLocked(now: start.addingTimeInterval(30))
+
+        let effects = state.displayConfigurationChanged(
+            isScreenLocked: true,
+            hasActiveDisplay: true,
+            now: start.addingTimeInterval(35)
+        )
+
+        XCTAssertEqual(effects, [])
+        XCTAssertEqual(state.phase, .paused)
+        XCTAssertEqual(state.pauseCause, .locked)
+    }
+
+    func testDisplayReconfigurationWaitsWhileEveryDisplayIsAsleep() {
+        var state = makeState()
+        _ = state.screenLocked(now: start.addingTimeInterval(30))
+
+        let effects = state.displayConfigurationChanged(
+            isScreenLocked: false,
+            hasActiveDisplay: false,
+            now: start.addingTimeInterval(35)
+        )
+
+        XCTAssertEqual(effects, [])
+        XCTAssertEqual(state.phase, .paused, "nobody is looking at a sleeping machine yet")
+    }
+
+    func testDisplayReconfigurationLeavesOtherStatesAlone() {
+        var manual = makeState()
+        _ = manual.pauseManually(now: start.addingTimeInterval(30))
+        XCTAssertEqual(
+            manual.displayConfigurationChanged(
+                isScreenLocked: false, hasActiveDisplay: true, now: start.addingTimeInterval(35)),
+            [])
+        XCTAssertEqual(manual.pauseCause, .manual, "a pause the user asked for is not stale")
+
+        var working = makeState()
+        XCTAssertEqual(
+            working.displayConfigurationChanged(
+                isScreenLocked: false, hasActiveDisplay: true, now: start.addingTimeInterval(35)),
+            [],
+            "rearranging screens must not restart a running countdown"
+        )
+        XCTAssertEqual(working.remaining, 20 * 60)
+
+        var onBreak = makeState()
+        runToBreak(&onBreak, from: start)
+        XCTAssertEqual(
+            onBreak.displayConfigurationChanged(
+                isScreenLocked: false, hasActiveDisplay: true, now: start.addingTimeInterval(1300)),
+            [])
+        XCTAssertEqual(onBreak.phase, .onBreak)
+    }
+
     // MARK: - Idle
 
     func testIdlePauseHonoursTheThresholdAndTheReturn() {

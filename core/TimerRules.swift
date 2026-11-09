@@ -135,6 +135,21 @@ public enum TimerRules {
         trigger.pausesOnIdle && secondsSinceInput < idleReturnSeconds
     }
 
+    /// Whether a display going to sleep means the user left.
+    ///
+    /// Closing a MacBook lid with an external monitor attached puts only the
+    /// built-in panel to sleep; the external display stays lit and in use.
+    /// Treating that notification as "away" starts a lock pause whose unlock
+    /// can never arrive — the display that went to sleep is the closed lid.
+    /// Only a genuinely locked session, or *every* display being asleep,
+    /// counts as an absence.
+    public static func shouldPauseForDisplaySleep(
+        isScreenLocked: Bool,
+        activeDisplayCount: Int
+    ) -> Bool {
+        isScreenLocked || activeDisplayCount <= 0
+    }
+
     // MARK: - Skip streak
 
     /// After this many consecutive skips the overlay nudges the user to stay —

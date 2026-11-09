@@ -155,4 +155,19 @@ final class TimerRulesTests: XCTestCase {
         // idle detection into a once-a-minute affair.
         XCTAssertEqual(TimerRules.pollIntervalSeconds, 5)
     }
+
+    func testDisplaySleepIsNotAnAbsenceWhileAMonitorIsLit() {
+        // Closing a lid with an external monitor attached: the built-in panel
+        // sleeps, the external one stays in use, nothing is locked.
+        XCTAssertFalse(
+            TimerRules.shouldPauseForDisplaySleep(isScreenLocked: false, activeDisplayCount: 1))
+        XCTAssertFalse(
+            TimerRules.shouldPauseForDisplaySleep(isScreenLocked: false, activeDisplayCount: 2))
+
+        // A genuinely locked session, or every display asleep, still counts.
+        XCTAssertTrue(
+            TimerRules.shouldPauseForDisplaySleep(isScreenLocked: true, activeDisplayCount: 1))
+        XCTAssertTrue(
+            TimerRules.shouldPauseForDisplaySleep(isScreenLocked: false, activeDisplayCount: 0))
+    }
 }

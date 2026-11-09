@@ -12,6 +12,55 @@ class OverlayManager {
     private var overlayWindows: [NSPanel] = []
     private var compactPanel: NSPanel?
     private var isCompactMode: Bool = false
+    /// A break that is currently on screen, so the panels can be rebuilt when
+    /// the display set changes underneath them.
+    private weak var presentedTimerManager: TimerManager?
+    private var isPresentingBreak = false
+    private var screenObservers: [NSObjectProtocol] = []
+    /// What the current panels were built for (display id + wake state + frame).
+    private var lastLayoutSignature: [String] = []
+    private var relayoutScheduled = false
+
+    init() {
+        // A lid closing can emit a display-sleep notification, a display
+        // reconfiguration, or both, in either order — and sometimes before
+        // `NSScreen.screens` has been updated. Listen to all of them, then
+        // check the actual screen set once things have settled.
+        let handleChange: @Sendable (Notification) -> Void = { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.scheduleRelayout()
+            }
+        }
+        let appCenter = NotificationCenter.default
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+        screenObservers = [
+            appCenter.addObserver(
+                forName: NSApplication.didChangeScreenParametersNotification,
+                object: nil,
+                queue: .main,
+                using: handleChange
+            ),
+            workspaceCenter.addObserver(
+                forName: NSWorkspace.screensDidSleepNotification,
+                object: nil,
+                queue: .main,
+                using: handleChange
+            ),
+            workspaceCenter.addObserver(
+                forName: NSWorkspace.screensDidWakeNotification,
+                object: nil,
+                queue: .main,
+                using: handleChange
+            ),
+        ]
+    }
+
+    deinit {
+        for observer in screenObservers {
+            NotificationCenter.default.removeObserver(observer)
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+    }
 
     // Carbon global hotkey refs for escape (used by both full and compact overlays)
     private var escapeHotKeyRef: EventHotKeyRef?
@@ -30,8 +79,33 @@ class OverlayManager {
     /// as a black screen with no message and no countdown on it. Falling back
     /// to the first screen keeps the promise that a break always says
     /// something.
+    ///
+    /// It can also go stale: after a lid closes, `main` may still name the
+    /// built-in panel that is no longer in the display set. Only believe it
+    /// while that screen is both present and awake, otherwise the one panel
+    /// carrying the text is the one nobody can see.
+    private static func isActive(_ screen: NSScreen) -> Bool {
+        guard
+            let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")]
+                as? CGDirectDisplayID
+        else { return true }
+        return CGDisplayIsActive(id) != 0
+    }
+
     private static var primaryScreen: NSScreen? {
-        NSScreen.main ?? NSScreen.screens.first
+        let screens = NSScreen.screens
+        let awake = screens.filter(isActive)
+        let candidates = awake.isEmpty ? screens : awake
+        guard !candidates.isEmpty else { return nil }
+        // Return an object from `screens`: the caller compares with `==`, and
+        // AppKit can hand out a freshly wrapped `NSScreen.main` during a
+        // reconfiguration. Matching by frame survives that object churn.
+        if let main = NSScreen.main,
+            let match = candidates.first(where: { $0.frame == main.frame })
+        {
+            return match
+        }
+        return candidates.first
     }
 
     func showBreakOverlay(timerManager: TimerManager) {
@@ -65,6 +139,9 @@ class OverlayManager {
         }
 
         isCompactMode = false
+        isPresentingBreak = true
+        presentedTimerManager = timerManager
+        lastLayoutSignature = Self.screenSignature()
         installKeyMonitor(timerManager: timerManager)
     }
 
@@ -73,7 +150,17 @@ class OverlayManager {
     func showCompactBreakOverlay(timerManager: TimerManager) {
         dismissOverlay()
 
-        guard let screen = OverlayManager.primaryScreen else { return }
+        // Keep the break marked as presented even if no screen is available
+        // right now — a display may come back a moment after a lid opens.
+        isPresentingBreak = true
+        presentedTimerManager = timerManager
+        guard let screen = OverlayManager.primaryScreen else {
+            // Keep the chosen mode, so the rebuild when a display returns uses
+            // the compact panel rather than silently switching to full screen.
+            isCompactMode = true
+            lastLayoutSignature = Self.screenSignature()
+            return
+        }
 
         let panelWidth: CGFloat = 360
         let panelHeight: CGFloat = 420
@@ -119,12 +206,16 @@ class OverlayManager {
         panel.orderFrontRegardless()
         compactPanel = panel
         isCompactMode = true
+        lastLayoutSignature = Self.screenSignature()
         installKeyMonitor(timerManager: timerManager)
     }
 
     // MARK: - Dismiss
 
     func dismissWithAnimation(completion: @escaping () -> Void = {}) {
+        // The break is over; a display change during the fade-out must not
+        // bring the panels back.
+        isPresentingBreak = false
         let windows = isCompactMode ? (compactPanel.map { [$0] } ?? []) : overlayWindows
         for window in windows {
             NSAnimationContext.runAnimationGroup { context in
@@ -148,6 +239,48 @@ class OverlayManager {
         compactPanel?.orderOut(nil)
         compactPanel = nil
         isCompactMode = false
+        isPresentingBreak = false
+        presentedTimerManager = nil
+    }
+
+    /// Frames alone miss a display that stays in `NSScreen.screens` but falls
+    /// asleep (a closed lid), so the id and wake state are part of it too.
+    private static func screenSignature() -> [String] {
+        NSScreen.screens.map { screen in
+            let id =
+                screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")]
+                as? CGDirectDisplayID ?? 0
+            return "\(id)-\(isActive(screen))-\(NSStringFromRect(screen.frame))"
+        }
+    }
+
+    private func scheduleRelayout() {
+        guard isPresentingBreak, !relayoutScheduled else { return }
+        relayoutScheduled = true
+        // AppKit may still be reporting the old display set when the first
+        // notification arrives. One short wait, then compare against what the
+        // panels were built for — several notifications collapse into one
+        // rebuild.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            self?.relayoutScheduled = false
+            self?.relayoutForScreenChange()
+        }
+    }
+
+    /// Panels are built for a fixed screen frame, and exactly one of them draws
+    /// the message and countdown. If that screen is the laptop lid that just
+    /// closed, the remaining screens would show a black panel with nothing on
+    /// it for the rest of the break. Rebuilding puts the content back on a
+    /// display that is actually lit.
+    private func relayoutForScreenChange() {
+        guard isPresentingBreak, let timerManager = presentedTimerManager else { return }
+        guard Self.screenSignature() != lastLayoutSignature else { return }
+        let wasCompact = isCompactMode
+        if wasCompact {
+            showCompactBreakOverlay(timerManager: timerManager)
+        } else {
+            showBreakOverlay(timerManager: timerManager)
+        }
     }
 
     // MARK: - Private
